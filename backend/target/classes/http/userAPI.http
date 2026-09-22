@@ -1,0 +1,13 @@
+### =========================
+### GET ALL USERS
+### =========================
+GET {{url}}/users
+Authorization: Bearer {{token}}
+
+
+### =========================
+### GET USER BY ID
+### /user/{id}
+### =========================
+GET {{url}}/user/1
+Authorization: Bearer {{token}}

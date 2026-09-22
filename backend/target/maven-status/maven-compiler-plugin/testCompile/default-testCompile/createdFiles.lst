@@ -1,0 +1,11 @@
+app\services\PlanningValidationServiceTest.class
+app\services\EmailServiceTest.class
+app\daos\UserDAOTest.class
+app\daos\generic\EntityManagerDAOTest$EntityUpdate.class
+app\SetupTest.class
+app\services\PasswordServiceTest.class
+app\services\MessageServiceTest.class
+app\services\PlanningStoriesTest.class
+app\security\SecurityServiceTest.class
+app\daos\generic\EntityManagerDAOTest.class
+app\services\EmailServiceTest$SentMail.class

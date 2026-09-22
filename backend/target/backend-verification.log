@@ -1,0 +1,112 @@
+sep. 17, 2026 9:29:18 PM org.hibernate.Version logVersion
+INFO: HHH000412: Hibernate ORM core version 7.1.0.Final
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:testdb user=
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+sep. 17, 2026 9:29:18 PM org.hibernate.engine.jdbc.dialect.internal.DialectFactoryImpl constructDialect
+WARN: HHH90000025: H2Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+sep. 17, 2026 9:29:18 PM org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator logConnectionInfo
+INFO: HHH10001005: Database info:
+	Database JDBC URL [jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1]
+	Database driver: org.h2.Driver
+	Database dialect: H2Dialect
+	Database version: 2.2.224
+	Default catalog/schema: TESTDB/PUBLIC
+	Autocommit mode: true
+	Isolation level: READ_COMMITTED
+	JDBC fetch size: 100
+	Pool: HikariCPConnectionProvider
+	Minimum pool size: 10
+	Maximum pool size: 10
+sep. 17, 2026 9:29:19 PM org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator initiateService
+INFO: HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): The password must contain an uppercase letter
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): The password must contain a lowercase letter
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): The password must be between 8 and 30 characters
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): The password must contain a special character
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-2 - Starting...
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-2 - Added connection conn10: url=jdbc:h2:mem:testdb user=
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-2 - Start completed.
+sep. 17, 2026 9:29:20 PM org.hibernate.engine.jdbc.dialect.internal.DialectFactoryImpl constructDialect
+WARN: HHH90000025: H2Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+sep. 17, 2026 9:29:20 PM org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator logConnectionInfo
+INFO: HHH10001005: Database info:
+	Database JDBC URL [jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1]
+	Database driver: org.h2.Driver
+	Database dialect: H2Dialect
+	Database version: 2.2.224
+	Default catalog/schema: TESTDB/PUBLIC
+	Autocommit mode: true
+	Isolation level: READ_COMMITTED
+	JDBC fetch size: 100
+	Pool: HikariCPConnectionProvider
+	Minimum pool size: 10
+	Maximum pool size: 10
+sep. 17, 2026 9:29:20 PM org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator initiateService
+INFO: HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): You must enter a task title.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): You must enter a task title.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Price must not be negative.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Price must not be negative.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Price must be a number.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Price must be a number.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Price must be a number.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Price must be a number.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Price must be a number.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Price must be a number.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Estimated hours must not be negative.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Estimated hours must not be negative.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Estimated hours must be a number.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Estimated hours must be a number.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Deadline must be a valid date in YYYY-MM-DD format.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Deadline must be a valid date in YYYY-MM-DD format.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Link must be a valid HTTP or HTTPS URL.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Link must be a valid HTTP or HTTPS URL.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Link must be a valid HTTP or HTTPS URL.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Link must be a valid HTTP or HTTPS URL.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Priority must be LOW, MEDIUM or HIGH.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Priority must be LOW, MEDIUM or HIGH.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): The Uncategorized category cannot be deleted.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): The Uncategorized category cannot be renamed or replaced.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Uncategorized is a reserved category name.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): You must enter a category title.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): You must enter a wedding title.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): You must enter a wedding title.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): You must enter a wedding description.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): You must enter a wedding description.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): date must be a valid date in YYYY-MM-DD format.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): date must be a valid date in YYYY-MM-DD format.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): budget must not be negative.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): budget must not be negative.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): budget must be a number.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): budget must be a number.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): budget must be a number.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): budget must be a number.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): budget must be a number.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): budget must be a number.
+[main] ERROR app.exceptions.ApiException - ApiException (code=404): Wedding not found.
+[main] ERROR app.exceptions.ApiException - ApiException (code=404): Task not found.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Tasks can only be moved between categories in the same wedding.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): position must be between 0 and 0.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): position must be between 0 and 3.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): position must be between 0 and 0.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): position must be between 0 and 3.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): position must be an integer.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): position must be an integer.
+[main] ERROR app.exceptions.ApiException - ApiException (code=404): Wedding not found.
+[main] ERROR app.exceptions.ApiException - ApiException (code=404): Category not found.
+[main] ERROR app.exceptions.ApiException - ApiException (code=404): Task not found.
+[main] ERROR app.exceptions.ApiException - ApiException (code=404): Task not found.
+[main] ERROR app.exceptions.ApiException - ApiException (code=404): Task not found.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-2 - Shutdown initiated...
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-2 - Shutdown completed.
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): range
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): invalid
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): invalid
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): invalid
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): invalid
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Body is empty or invalid!
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): Body is empty or invalid!
+[main] ERROR app.exceptions.ApiException - ApiException (code=400): title must be at most 255 characters.
