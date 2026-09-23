@@ -1,0 +1,27 @@
+# Default owners
+* @Linus-llm @Rovelt123 @olivermjmj @Tessellation93
+
+
+# Documentation
+/AGENTS.md @olivermjmj @Linus-llm
+/ARCHITECTURE.md @olivermjmj @Linus-llm
+/CODESTANDARD.md @olivermjmj @Linus-llm
+
+
+# GitHub configuration
+/.github/CODEOWNERS @olivermjmj
+/.github/ISSUE_TEMPLATE/issueTemplate.md @olivermjmj @Linus-llm
+
+
+# ------------------------------------------------------------
+# Individual ownership
+# ------------------------------------------------------------
+
+# Backend example:
+# /backend/src/main/java/customer/CustomerController.java @username
+
+# Frontend example:
+# /frontend/src/pages/HomePage.jsx @username
+
+# Issue template example:
+# /.github/ISSUE_TEMPLATE/Frontend-taskName.md @username
