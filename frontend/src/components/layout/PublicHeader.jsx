@@ -4,9 +4,9 @@ import styles from './PublicHeader.module.css'
 
 const navigation = ['Om godset', 'Julemarked', 'Stadeholdere', 'Kontakt']
 
-function PublicHeader({ activeItem, ctaLabel = 'ANSØG OM EN STAND' }) {
+function PublicHeader({ activeItem, ctaLabel = 'ANSØG OM EN STAND', variant }) {
   return (
-    <header className={styles.header}>
+    <header className={`${styles.header}${variant === 'application' ? ` ${styles.application}` : ''}`}>
       <button type="button" aria-disabled="true" aria-label="Engestofte Gods" className={styles.logo}>
         <span>Engestofte</span><span>Gods</span>
       </button>

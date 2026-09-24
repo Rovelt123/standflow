@@ -1,0 +1,282 @@
+.page {
+  min-height: calc(100vh - 74px);
+  padding: 32px var(--page-gutter) 20px;
+  background: var(--color-application-background);
+  color: var(--color-ink);
+}
+
+.container {
+  max-width: 1120px;
+  margin-inline: auto;
+}
+
+.introduction {
+  margin-bottom: 24px;
+}
+
+.introduction h1 {
+  color: var(--color-burgundy);
+  font-size: clamp(27px, 2.5vw, 32px);
+  line-height: 1.2;
+  margin-bottom: 10px;
+}
+
+.introduction p {
+  color: var(--color-ink-muted);
+  font-size: 13px;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.235fr) minmax(0, 1fr);
+  align-items: start;
+  gap: calc(var(--space-large) + 6px);
+}
+
+.company, .stands {
+  padding: 22px;
+  border: 1px solid var(--color-paper-border);
+  border-radius: var(--radius-small);
+  background: var(--color-application-panel);
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.fullWidth {
+  grid-column: 1 / -1;
+}
+
+.field, .fullWidth {
+  min-width: 0;
+}
+
+.fields label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.fields input, .fields textarea {
+  width: 100%;
+  min-width: 0;
+  height: 39px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-paper-border);
+  border-radius: var(--radius-small);
+  background: var(--color-white);
+  color: var(--color-ink-muted);
+  font: 12px/1.4 var(--font-body);
+}
+
+.fields textarea {
+  display: block;
+  height: 98px;
+  resize: none;
+}
+
+.fields input:focus-visible, .fields textarea:focus-visible {
+  outline: 2px solid var(--color-burgundy);
+  outline-offset: 3px;
+}
+
+.previousExhibitor {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  margin-top: 14px;
+  font-size: 12px;
+}
+
+.previousExhibitor input {
+  appearance: none;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin: 3px 0 0;
+  border: 1px solid var(--color-gold);
+  border-radius: 2px;
+  background: var(--color-gold) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 8 3 3 5-6' fill='none' stroke='%23491b1b' stroke-width='2'/%3E%3C/svg%3E") center / 14px no-repeat;
+  opacity: 1;
+}
+
+.companyColumn, .standColumn {
+  min-width: 0;
+}
+
+.company h2, .stands h2 {
+  margin-bottom: 16px;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--color-burgundy);
+}
+
+.standList {
+  display: grid;
+  gap: 9px;
+}
+
+.stand {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 55px;
+  padding: 9px 11px;
+  border: 1px solid var(--color-paper-border);
+  border-radius: var(--radius-small);
+  background: var(--color-white);
+  color: var(--color-ink);
+  text-align: left;
+  cursor: default;
+}
+
+.letter {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--color-paper-border);
+  border-radius: var(--radius-small);
+  font-size: 12px;
+}
+
+.standInformation {
+  display: grid;
+  gap: 2px;
+}
+
+.standTitle {
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.dimensions {
+  color: var(--color-ink);
+  font-size: 12px;
+}
+
+.price {
+  color: var(--color-terracotta);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.price span {
+  display: inline;
+  font-size: 11px;
+}
+
+.furnishings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 16px;
+}
+
+.furnishing p {
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.furnishing p span {
+  color: var(--color-ink-muted);
+  white-space: nowrap;
+}
+
+.quantity {
+  display: grid;
+  grid-template-columns: 36px minmax(24px, 1fr) 36px;
+  align-items: center;
+  border: 1px solid var(--color-paper-border);
+  border-radius: var(--radius-small);
+  background: var(--color-white);
+  text-align: center;
+}
+
+.quantity button {
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-burgundy);
+  font-size: 20px;
+  cursor: default;
+}
+
+.actions {
+  display: flex;
+  justify-content: end;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.actions button {
+  min-height: 41px;
+  padding: 10px 26px;
+  border: 1px solid var(--color-burgundy);
+  border-radius: var(--radius-small);
+  font-size: 12px;
+  cursor: default;
+}
+
+.cancel {
+  background: var(--color-white);
+  color: var(--color-burgundy);
+}
+
+.send {
+  background: var(--color-burgundy);
+  color: var(--color-white);
+}
+
+.page button:focus-visible {
+  outline-color: var(--color-burgundy);
+  outline-offset: 3px;
+}
+
+@media (max-width: 1050px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .page {
+    padding-block: 28px 40px;
+  }
+
+  .company, .stands {
+    padding: 18px;
+  }
+
+  .fields, .furnishings {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fields input, .fields textarea, .previousExhibitor, .standTitle, .dimensions {
+    font-size: 14px;
+  }
+
+  .fields textarea {
+    height: auto;
+    min-height: 200px;
+    field-sizing: content;
+  }
+
+  .stand {
+    grid-template-columns: 26px minmax(0, 1fr);
+  }
+
+  .price {
+    grid-column: 2;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+}

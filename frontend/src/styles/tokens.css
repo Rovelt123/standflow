@@ -6,6 +6,13 @@
   --color-muted: #d2bda9;
   --color-gold: #c5a66a;
   --color-border: #795439;
+  --color-application-background: #faf8f1;
+  --color-application-panel: #f3ead7;
+  --color-white: #fff;
+  --color-ink: #28231f;
+  --color-ink-muted: #655e55;
+  --color-paper-border: #e6d8bf;
+  --color-terracotta: #b87930;
   --font-heading: Georgia, 'Times New Roman', serif;
   --font-body: Georgia, 'Times New Roman', serif;
   --space-small: 12px;
