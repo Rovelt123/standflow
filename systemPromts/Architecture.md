@@ -142,11 +142,6 @@ Pages may combine multiple components to create complete application views.
 Navigation between frontend pages is handled using React Router.
 Routing changes should remain within the frontend unless a corresponding backend API change is explicitly required.
 
-## Drag and drop
-
-Drag-and-drop functionality is implemented using dnd-kit.
-Existing drag-and-drop patterns should be reused instead of introducing another drag-and-drop dependency.
-
 # Backend architecture
 
 The backend is responsible for:
