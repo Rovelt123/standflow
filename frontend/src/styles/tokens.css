@@ -1,0 +1,17 @@
+/* Visually approximated from Figma; original font and layer values are unavailable. */
+:root {
+  --color-burgundy: #491b1b;
+  --color-wine: #321110;
+  --color-cream: #f5ecd6;
+  --color-muted: #d2bda9;
+  --color-gold: #c5a66a;
+  --color-border: #795439;
+  --font-heading: Georgia, 'Times New Roman', serif;
+  --font-body: Georgia, 'Times New Roman', serif;
+  --space-small: 12px;
+  --space-medium: 24px;
+  --space-large: 40px;
+  --page-gutter: clamp(20px, 6.25vw, 96px);
+  --radius-small: 4px;
+  --border-fine: 1px solid var(--color-border);
+}
