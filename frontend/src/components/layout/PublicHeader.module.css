@@ -20,6 +20,17 @@
   line-height: .95;
   font-size: 16px;
 }
+.application {
+  min-height: 74px;
+}
+.application .navigation button {
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.application .navigation button[aria-current] {
+  text-decoration: underline;
+  text-underline-offset: 9px;
+}
 .logo span + span {
   font-size: 12px;
 }
