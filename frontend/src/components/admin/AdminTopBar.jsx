@@ -1,12 +1,10 @@
+import Logo from '../ui/Logo.jsx'
 import styles from './AdminTopBar.module.css'
 
 function AdminTopBar({ title }) {
   return (
     <header className={styles.topBar}>
-      <div className={styles.logo}>
-        <span>Engestofte</span>
-        <span className={styles.logoSub}>Gods</span>
-      </div>
+      <Logo />
       <span className={styles.divider} />
       <h1 className={styles.title}>{title}</h1>
     </header>
