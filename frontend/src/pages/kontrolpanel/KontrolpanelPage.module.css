@@ -1,22 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&display=swap');
 
 .page {
-  --admin-maroon: #4a1a1c;
-  --admin-cream: #f6eee1;
-  --admin-background: #f3eada;
-  --admin-surface: #f4ebdc;
-  --admin-line: #e6d6bf;
-  --admin-ink: #3d2020;
-  --admin-ink-strong: #2a1414;
-  --admin-muted: #6f605a;
-  --admin-icon: #d8cab4;
-  --admin-gold: #c9a26c;
-  --admin-gold-dark: #b58c55;
-  --admin-green: #4e6b47;
-  --admin-green-bg: #e9ead6;
-  --admin-red: #8a2a2e;
-  --admin-red-bg: #f1ddd2;
-
   /* Full-viewport app shell, independent of the starter #root layout */
   position: fixed;
   inset: 0;
@@ -25,8 +9,8 @@
   grid-template-rows: auto 1fr;
   font-family: 'Cormorant Garamond', Garamond, Georgia, serif;
   text-align: left;
-  color: var(--admin-ink);
-  background: var(--admin-background);
+  color: var(--color-wine);
+  background: var(--color-cream);
   color-scheme: light;
 }
 

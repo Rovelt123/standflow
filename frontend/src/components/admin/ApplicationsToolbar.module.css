@@ -27,7 +27,7 @@
   width: 20px;
   height: 20px;
   fill: none;
-  stroke: var(--admin-maroon);
+  stroke: var(--color-burgundy);
   stroke-width: 2.6;
   stroke-linecap: round;
 }
@@ -37,13 +37,13 @@
   min-width: 0;
   border: none;
   background: transparent;
-  color: var(--admin-ink);
+  color: var(--color-wine);
   font-family: inherit;
   font-size: 16px;
 }
 
 .searchInput::placeholder {
-  color: var(--admin-ink);
+  color: var(--color-wine);
 }
 
 .searchInput:focus {
@@ -52,7 +52,7 @@
 
 .search:focus-within,
 .selectWrapper:focus-visible {
-  outline: 2px solid var(--admin-gold);
+  outline: 2px solid var(--color-gold);
   outline-offset: -2px;
   border-radius: 4px;
 }
@@ -61,7 +61,7 @@
   width: 1px;
   height: 100%;
   margin: 0 16px;
-  background: var(--admin-line);
+  background: var(--color-muted);
 }
 
 .selectWrapper {
@@ -73,7 +73,7 @@
   padding: 0 38px 0 0;
   border: none;
   background: transparent;
-  color: var(--admin-ink);
+  color: var(--color-wine);
   font-family: inherit;
   font-size: 16px;
   cursor: default;
@@ -89,7 +89,7 @@
   width: 14px;
   height: 14px;
   fill: none;
-  stroke: var(--admin-ink-strong);
+  stroke: var(--color-wine);
   stroke-width: 3;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -101,8 +101,8 @@
   padding: 0 22px;
   border: none;
   border-radius: 2px;
-  background: var(--admin-gold);
-  color: var(--admin-cream);
+  background: var(--color-gold);
+  color: var(--color-cream);
   font-family: inherit;
   font-size: 14px;
   font-weight: 600;
@@ -111,11 +111,7 @@
   cursor: default;
 }
 
-.exportButton:hover {
-  background: var(--admin-gold-dark);
-}
-
 .exportButton:focus-visible {
-  outline: 2px solid var(--admin-maroon);
+  outline: 2px solid var(--color-burgundy);
   outline-offset: 2px;
 }

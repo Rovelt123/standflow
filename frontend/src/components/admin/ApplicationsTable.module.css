@@ -2,7 +2,7 @@
   flex: 1;
   min-height: 400px;
   margin-top: 16px;
-  border: 1px solid var(--admin-line);
+  border: 1px solid var(--color-muted);
   border-radius: 0 0 6px 6px;
   overflow: hidden;
 }
@@ -15,8 +15,8 @@
 .table th {
   height: 50px;
   padding: 0 27px;
-  background: var(--admin-maroon);
-  color: var(--admin-gold);
+  background: var(--color-burgundy);
+  color: var(--color-gold);
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -27,8 +27,8 @@
 .table td {
   height: 69px;
   padding: 0 27px;
-  border-bottom: 1px solid var(--admin-line);
-  color: var(--admin-ink);
+  border-bottom: 1px solid var(--color-muted);
+  color: var(--color-wine);
   font-size: 19px;
 }
 
@@ -42,5 +42,5 @@
 }
 
 .table .muted {
-  color: var(--admin-muted);
+  color: var(--color-border);
 }
