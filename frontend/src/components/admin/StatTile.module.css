@@ -27,11 +27,11 @@
 }
 
 .positive {
-  color: var(--color-border);
+  color: var(--color-success);
 }
 
 .negative {
-  color: var(--color-burgundy);
+  color: var(--color-danger);
 }
 
 .note {

@@ -15,13 +15,13 @@
 }
 
 .approved {
-  border-color: var(--color-gold);
-  color: var(--color-wine);
-  background: var(--color-gold);
+  border-color: var(--color-success);
+  color: var(--color-success);
+  background: var(--color-cream);
 }
 
 .rejected {
-  border-color: var(--color-burgundy);
-  color: var(--color-cream);
-  background: var(--color-burgundy);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  background: var(--color-cream);
 }
