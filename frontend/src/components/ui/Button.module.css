@@ -1,0 +1,25 @@
+.button {
+  min-height: 44px;
+  padding: 12px 26px;
+  border: 1px solid var(--color-gold);
+  border-radius: var(--radius-small);
+  font-size: 12px;
+  letter-spacing: .025em;
+  cursor: default;
+}
+.outline {
+  color: var(--color-cream);
+  background: transparent;
+}
+.primary {
+  color: var(--color-wine);
+  background: var(--color-gold);
+}
+.compact {
+  min-height: 34px;
+  padding: 8px 20px;
+  border-radius: 30px;
+  font-size: 10px;
+  color: var(--color-gold);
+  background: transparent;
+}
