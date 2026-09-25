@@ -1,0 +1,27 @@
+.badge {
+  display: inline-block;
+  padding: 3px 13px 4px;
+  border: 1.5px solid;
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pending {
+  border-color: var(--admin-gold);
+  color: var(--admin-maroon);
+  background: var(--admin-surface);
+}
+
+.approved {
+  border-color: var(--admin-green);
+  color: var(--admin-green);
+  background: var(--admin-green-bg);
+}
+
+.rejected {
+  border-color: var(--admin-red);
+  color: var(--admin-red);
+  background: var(--admin-red-bg);
+}

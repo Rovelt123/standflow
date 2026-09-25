@@ -1,0 +1,132 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 70px 22px 50px;
+}
+
+.filters {
+  display: flex;
+  align-items: center;
+  height: 48px;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 330px;
+  height: 100%;
+  padding: 0 16px;
+  box-sizing: border-box;
+}
+
+.searchIcon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: var(--admin-maroon);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--admin-ink);
+  font-family: inherit;
+  font-size: 16px;
+}
+
+.searchInput::placeholder {
+  color: var(--admin-ink);
+}
+
+.searchInput:focus {
+  outline: none;
+}
+
+.search:focus-within,
+.selectWrapper:focus-within {
+  outline: 2px solid var(--admin-gold);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+.separator {
+  width: 1px;
+  height: 100%;
+  margin: 0 16px;
+  background: var(--admin-line);
+}
+
+.selectWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  padding: 0 16px 0 0;
+  color: var(--admin-ink);
+  font-size: 16px;
+}
+
+.selectLabel {
+  white-space: nowrap;
+}
+
+.select {
+  appearance: none;
+  padding-right: 22px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.select:focus {
+  outline: none;
+}
+
+.chevron {
+  position: absolute;
+  right: 16px;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--admin-ink-strong);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.exportButton {
+  height: 48px;
+  padding: 0 22px;
+  border: none;
+  border-radius: 2px;
+  background: var(--admin-gold);
+  color: var(--admin-cream);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.exportButton:hover {
+  background: var(--admin-gold-dark);
+}
+
+.exportButton:focus-visible {
+  outline: 2px solid var(--admin-maroon);
+  outline-offset: 2px;
+}
