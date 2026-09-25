@@ -24,7 +24,7 @@ function AdminSidebar() {
       <ul className={styles.list}>
         {navItems.map((item) => (
           <li key={item.label}>
-            <button type="button" className={styles.item}>
+            <button type="button" aria-disabled="true" className={styles.item}>
               <svg className={styles.icon} viewBox="0 0 24 24" aria-hidden="true">
                 <path d={iconPaths[item.icon]} />
               </svg>

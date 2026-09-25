@@ -27,7 +27,7 @@
   font-family: inherit;
   font-size: 19px;
   text-align: left;
-  cursor: pointer;
+  cursor: default;
 }
 
 .item:hover {

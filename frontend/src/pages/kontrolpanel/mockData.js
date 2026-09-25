@@ -7,8 +7,6 @@ export const stats = [
   { label: 'Samlet standomsætning', value: '248.900 DKR', note: '+15% vs sidste år', tone: 'default' },
 ]
 
-export const standTypes = ['Stor bod', 'Lille bod', 'Madbod']
-
 export const applications = [
   { id: 1, company: 'Kirstens Hjemmebag', contact: 'Kirsten Nielsen', standType: 'Stor bod', status: 'pending', date: '12. Okt 2026' },
   { id: 2, company: 'Nordisk Keramik design', contact: 'Lars Thomsen', standType: 'Lille bod', status: 'approved', date: '11. Okt 2026' },

@@ -51,7 +51,7 @@
 }
 
 .search:focus-within,
-.selectWrapper:focus-within {
+.selectWrapper:focus-visible {
   outline: 2px solid var(--admin-gold);
   outline-offset: -2px;
   border-radius: 4px;
@@ -70,28 +70,17 @@
   align-items: center;
   gap: 4px;
   height: 100%;
-  padding: 0 16px 0 0;
+  padding: 0 38px 0 0;
+  border: none;
+  background: transparent;
   color: var(--admin-ink);
+  font-family: inherit;
   font-size: 16px;
+  cursor: default;
 }
 
 .selectLabel {
   white-space: nowrap;
-}
-
-.select {
-  appearance: none;
-  padding-right: 22px;
-  border: none;
-  background: transparent;
-  color: inherit;
-  font-family: inherit;
-  font-size: inherit;
-  cursor: pointer;
-}
-
-.select:focus {
-  outline: none;
 }
 
 .chevron {
@@ -119,7 +108,7 @@
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  cursor: pointer;
+  cursor: default;
 }
 
 .exportButton:hover {

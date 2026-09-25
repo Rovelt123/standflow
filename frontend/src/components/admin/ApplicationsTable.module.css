@@ -44,8 +44,3 @@
 .table .muted {
   color: var(--admin-muted);
 }
-
-.table .empty {
-  text-align: center;
-  color: var(--admin-muted);
-}

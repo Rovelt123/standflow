@@ -1,6 +1,6 @@
 import styles from './ApplicationsToolbar.module.css'
 
-function ApplicationsToolbar({ search, onSearchChange, standType, onStandTypeChange, standTypes, onExport }) {
+function ApplicationsToolbar() {
   return (
     <div className={styles.toolbar}>
       <div className={styles.filters}>
@@ -14,32 +14,18 @@ function ApplicationsToolbar({ search, onSearchChange, standType, onStandTypeCha
             className={styles.searchInput}
             placeholder="Søg i ansøgninger..."
             aria-label="Søg i ansøgninger"
-            value={search}
-            onChange={(event) => onSearchChange(event.target.value)}
+            readOnly
           />
         </label>
         <span className={styles.separator} />
-        <label className={styles.selectWrapper}>
-          <span className={styles.selectLabel}>Standtype:</span>
-          <select
-            className={styles.select}
-            aria-label="Standtype"
-            value={standType}
-            onChange={(event) => onStandTypeChange(event.target.value)}
-          >
-            <option value="">Alle</option>
-            {standTypes.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
+        <button type="button" aria-disabled="true" className={styles.selectWrapper}>
+          <span className={styles.selectLabel}>Standtype: Alle</span>
           <svg className={styles.chevron} viewBox="0 0 24 24" aria-hidden="true">
             <path d="M6 9l6 6 6-6" />
           </svg>
-        </label>
+        </button>
       </div>
-      <button type="button" className={styles.exportButton} onClick={onExport}>
+      <button type="button" aria-disabled="true" className={styles.exportButton}>
         Eksportér CSV
       </button>
     </div>

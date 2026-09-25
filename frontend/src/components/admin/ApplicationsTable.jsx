@@ -26,13 +26,6 @@ function ApplicationsTable({ applications }) {
               <td className={styles.muted}>{application.date}</td>
             </tr>
           ))}
-          {applications.length === 0 && (
-            <tr>
-              <td colSpan={5} className={styles.empty}>
-                Ingen ansøgninger matcher søgningen.
-              </td>
-            </tr>
-          )}
         </tbody>
       </table>
     </div>
