@@ -2,7 +2,6 @@
 
 .page {
   --admin-maroon: #4a1a1c;
-  --admin-maroon-line: #6b3a30;
   --admin-cream: #f6eee1;
   --admin-background: #f3eada;
   --admin-surface: #f4ebdc;
@@ -23,12 +22,19 @@
   inset: 0;
   display: grid;
   grid-template-columns: 330px 1fr;
-  grid-template-rows: 88px 1fr;
+  grid-template-rows: auto 1fr;
   font-family: 'Cormorant Garamond', Garamond, Georgia, serif;
   text-align: left;
   color: var(--admin-ink);
   background: var(--admin-background);
   color-scheme: light;
+}
+
+.header {
+  grid-column: 1 / -1;
+  background: var(--color-burgundy);
+  color: var(--color-cream);
+  font-family: var(--font-body);
 }
 
 .main {

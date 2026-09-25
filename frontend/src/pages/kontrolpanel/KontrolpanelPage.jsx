@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import AdminTopBar from '../../components/admin/AdminTopBar.jsx'
+import PublicHeader from '../../components/layout/PublicHeader.jsx'
 import AdminSidebar from '../../components/admin/AdminSidebar.jsx'
 import StatTile from '../../components/admin/StatTile.jsx'
 import { statusLabels } from '../../components/admin/statusLabels.js'
@@ -57,7 +57,9 @@ function KontrolpanelPage() {
 
   return (
     <div className={styles.page}>
-      <AdminTopBar title="Kontrolpanel" />
+      <div className={styles.header}>
+        <PublicHeader />
+      </div>
       <AdminSidebar />
       <main className={styles.main}>
         <div className={styles.stats}>
