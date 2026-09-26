@@ -1,0 +1,46 @@
+.card {
+  flex: 1;
+  min-height: 400px;
+  margin-top: 16px;
+  border: 1px solid var(--color-muted);
+  border-radius: 0 0 6px 6px;
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  height: 50px;
+  padding: 0 27px;
+  background: var(--color-burgundy);
+  color: var(--color-gold);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.table td {
+  height: 69px;
+  padding: 0 27px;
+  border-bottom: 1px solid var(--color-muted);
+  color: var(--color-wine);
+  font-size: 19px;
+}
+
+.companyColumn {
+  width: 38%;
+}
+
+.table .dateHeader {
+  width: 150px;
+  text-align: right;
+}
+
+.table .muted {
+  color: var(--color-border);
+}

@@ -7,22 +7,6 @@
   gap: var(--space-medium);
   border-bottom: var(--border-fine);
 }
-.logo {
-  flex-shrink: 0;
-  display: grid;
-  place-content: center;
-  width: 92px;
-  height: 42px;
-  border: 1px solid var(--color-gold);
-  background: transparent;
-  color: var(--color-cream);
-  font-family: var(--font-heading);
-  line-height: .95;
-  font-size: 16px;
-}
-.logo span + span {
-  font-size: 12px;
-}
 .navigation {
   display: flex;
   flex-wrap: wrap;
