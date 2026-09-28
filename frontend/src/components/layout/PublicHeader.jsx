@@ -1,5 +1,6 @@
 import Button from '../ui/Button.jsx'
 import Icon from '../ui/Icon.jsx'
+import Logo from '../ui/Logo.jsx'
 import styles from './PublicHeader.module.css'
 
 const navigation = ['Om godset', 'Julemarked', 'Stadeholdere', 'Kontakt']
@@ -10,6 +11,7 @@ function PublicHeader({ activeItem, ctaLabel = 'ANSØG OM EN STAND', variant }) 
       <button type="button" aria-disabled="true" aria-label="Engestofte Gods" className={styles.logo}>
         <span>Engestofte</span><span>Gods</span>
       </button>
+      <Logo />
       <nav aria-label="Hovednavigation" className={styles.navigation}>
         {navigation.map((item) => (
           <button key={item} type="button" aria-disabled="true" aria-current={item === activeItem ? 'page' : undefined}>{item}</button>
