@@ -31,7 +31,7 @@ function LandingPage() {
             <h1 id="landing-title">Julemarked på Engestofte Gods</h1>
             <p className={styles.description}>Træd ind i en fortryllende verden af ægte herregårdsjul. Over to dage, fredag–lørdag kl. 10:00–16:00, fyldes godsets historiske lader og gårdsplads med duften af brændte mandler, gran og lune æbleskiver. Oplev over 80 unikke boder med dansk kunsthåndværk, lokale råvarer og smuk julepynt ved bredden af Maribo Søndersø.</p>
             <div className={styles.buttons}>
-              <Button variant="primary">ANSØG OM EN STAND</Button>
+              <Button to="/ansoegning" variant="primary">ANSØG OM EN STAND</Button>
               <Button>SE PLANTEGNING</Button>
             </div>
           </div>

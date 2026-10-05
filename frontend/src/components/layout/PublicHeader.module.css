@@ -23,11 +23,11 @@
 .application {
   min-height: 74px;
 }
-.application .navigation button {
+.application .navigation a {
   font-size: 11px;
   text-transform: uppercase;
 }
-.application .navigation button[aria-current] {
+.application .navigation a[aria-current] {
   text-decoration: underline;
   text-underline-offset: 9px;
 }
@@ -40,14 +40,14 @@
   justify-content: center;
   gap: 28px;
 }
-.navigation button {
+.navigation a {
   padding: 8px 0;
   border: 0;
   background: transparent;
   color: var(--color-cream);
   font-size: 13px;
 }
-.navigation button[aria-current] {
+.navigation a[aria-current] {
   color: var(--color-gold);
 }
 .actions {
@@ -84,7 +84,7 @@
   .navigation {
     gap: 18px;
   }
-  .navigation button {
+  .navigation a {
     font-size: 12px;
   }
   .actions {
@@ -92,3 +92,6 @@
     justify-content: center;
   }
 }
+
+.home, .navigation a { text-decoration: none; }
+.home:focus-visible, .navigation a:focus-visible { outline: 2px solid var(--color-gold); outline-offset: 5px; }
