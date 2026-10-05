@@ -18,5 +18,12 @@ public class Template {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Column(nullable = false, length = 150)
+    private String name;
 
+    @Column(nullable = false, length = 200)
+    private String subject;
+
+    @Column(nullable = false, length = 5000)
+    private String body;
 }
