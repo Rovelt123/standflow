@@ -27,6 +27,10 @@
 }
 
 .columns {
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
   display: grid;
   grid-template-columns: minmax(0, 1.235fr) minmax(0, 1fr);
   align-items: start;
@@ -92,14 +96,13 @@
 }
 
 .previousExhibitor input {
-  appearance: none;
+  accent-color: var(--color-burgundy);
   flex: 0 0 16px;
   width: 16px;
   height: 16px;
   margin: 3px 0 0;
   border: 1px solid var(--color-gold);
   border-radius: 2px;
-  background: var(--color-gold) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 8 3 3 5-6' fill='none' stroke='%23491b1b' stroke-width='2'/%3E%3C/svg%3E") center / 14px no-repeat;
   opacity: 1;
 }
 
@@ -121,7 +124,7 @@
 
 .stand {
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) auto;
+  grid-template-columns: 16px 26px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   width: 100%;
@@ -132,7 +135,22 @@
   background: var(--color-white);
   color: var(--color-ink);
   text-align: left;
-  cursor: default;
+  cursor: pointer;
+}
+
+.stand input {
+  margin: 0;
+  accent-color: var(--color-burgundy);
+}
+
+.stand:has(input:checked) {
+  border-color: var(--color-burgundy);
+  box-shadow: inset 0 0 0 1px var(--color-burgundy);
+}
+
+.stand:focus-within {
+  outline: 2px solid var(--color-burgundy);
+  outline-offset: 2px;
 }
 
 .letter {
@@ -178,12 +196,13 @@
   margin-top: 16px;
 }
 
-.furnishing p {
+.furnishing label {
+  display: block;
   margin-bottom: 8px;
   font-size: 13px;
 }
 
-.furnishing p span {
+.furnishing label span {
   color: var(--color-ink-muted);
   white-space: nowrap;
 }
@@ -205,7 +224,17 @@
   background: transparent;
   color: var(--color-burgundy);
   font-size: 20px;
-  cursor: default;
+  cursor: pointer;
+}
+
+.quantity input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  text-align: center;
+  color: var(--color-ink);
+  font: inherit;
 }
 
 .actions {
@@ -221,7 +250,33 @@
   border: 1px solid var(--color-burgundy);
   border-radius: var(--radius-small);
   font-size: 12px;
-  cursor: default;
+  cursor: pointer;
+}
+
+.page button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.error, .receipt {
+  padding: 20px;
+  border: 1px solid var(--color-burgundy);
+  border-radius: var(--radius-small);
+  background: var(--color-white);
+  overflow-wrap: anywhere;
+}
+
+.error {
+  margin-bottom: 24px;
+  color: var(--color-burgundy);
+}
+
+.receipt p {
+  margin-block: 16px;
+}
+
+.receipt a {
+  color: var(--color-burgundy);
 }
 
 .cancel {
@@ -269,11 +324,11 @@
   }
 
   .stand {
-    grid-template-columns: 26px minmax(0, 1fr);
+    grid-template-columns: 16px 26px minmax(0, 1fr);
   }
 
   .price {
-    grid-column: 2;
+    grid-column: 3;
   }
 
   .actions {

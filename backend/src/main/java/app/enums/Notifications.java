@@ -10,6 +10,12 @@ public enum Notifications {
     Notify("This is a message with args: %s!"),
     Notify2("This is a hardcoded message"),
 
+    // PASSWORD
+    PASSWORD_LENGTH_INVALID("Password must be between 8 and 30 characters long."),
+    PASSWORD_UPPERCASE_MISSING("Password must contain at least one uppercase letter."),
+    PASSWORD_LOWERCASE_MISSING("Password must contain at least one lowercase letter."),
+    PASSWORD_SPECIAL_CHAR_MISSING("Password must contain at least one special character."),
+
 
     // GENERICS
     GET_ALL_EMPTY("No data was fetched because %s was empty!"),
