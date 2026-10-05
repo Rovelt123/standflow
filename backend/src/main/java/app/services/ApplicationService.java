@@ -19,6 +19,8 @@ public class ApplicationService {
     private final ApplicationDAO applicationDAO;
     private final Supplier<IntakeStatus> intakeStatus;
     private final Clock clock;
+    private final ApplicationPdfGenerator pdfGenerator;
+    private final ApplicationEmailService emailService;
     private final ApplicationMapper mapper = new ApplicationMapper();
 
     /** Supplied by the separate administration feature; dates never open intake automatically. */
@@ -34,9 +36,19 @@ public class ApplicationService {
     //--------------------------------------------------------------
 
     public ApplicationService(ApplicationDAO applicationDAO, Supplier<IntakeStatus> intakeStatus, Clock clock) {
+        this(applicationDAO, intakeStatus, clock, new SimpleApplicationPdfGenerator(),
+                new GmailSmtpApplicationEmailService());
+    }
+
+    //--------------------------------------------------------------
+
+    public ApplicationService(ApplicationDAO applicationDAO, Supplier<IntakeStatus> intakeStatus, Clock clock,
+                              ApplicationPdfGenerator pdfGenerator, ApplicationEmailService emailService) {
         this.applicationDAO = Objects.requireNonNull(applicationDAO);
         this.intakeStatus = Objects.requireNonNull(intakeStatus);
         this.clock = Objects.requireNonNull(clock).withZone(ZoneOffset.UTC);
+        this.pdfGenerator = Objects.requireNonNull(pdfGenerator);
+        this.emailService = Objects.requireNonNull(emailService);
     }
 
     //--------------------------------------------------------------
@@ -45,11 +57,15 @@ public class ApplicationService {
         requireOpenIntake();
         ApplicationRequestDTO normalized = validate(request);
         Application application = mapper.toEntity(normalized, LocalDate.now(clock));
+        Application saved;
         try {
-            return mapper.toDTO(applicationDAO.create(application));
+            saved = applicationDAO.create(application);
         } catch (RuntimeException exception) {
             throw new ApiException(500, "Ansøgningen kunne ikke gemmes.");
         }
+        byte[] pdf = pdfGenerator.generate(saved);
+        emailService.sendApplication(saved, pdf, pdfGenerator.filename(saved));
+        return mapper.toDTO(saved);
     }
 
     //--------------------------------------------------------------
