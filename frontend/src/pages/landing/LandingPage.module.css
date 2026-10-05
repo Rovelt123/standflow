@@ -1,0 +1,194 @@
+.hero {
+  position: relative;
+  isolation: isolate;
+  min-height: 440px;
+  display: flex;
+  align-items: end;
+  padding: 140px var(--page-gutter) 40px;
+  background: var(--color-burgundy);
+}
+.heroImage {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 42%;
+}
+.hero::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(180deg, rgb(49 15 15 / 8%) 0%, rgb(64 20 20 / 48%) 38%, var(--color-burgundy) 100%);
+}
+.introduction {
+  max-width: 790px;
+}
+.date {
+  display: inline-block;
+  padding: 4px 12px;
+  border: 1px solid var(--color-gold);
+  color: var(--color-gold);
+  font-size: 10px;
+  letter-spacing: .04em;
+  margin-bottom: 18px;
+}
+.hero h1 {
+  font-size: clamp(34px, 3.6vw, 52px);
+  line-height: 1.13;
+  margin-bottom: 16px;
+}
+.description {
+  max-width: 730px;
+  color: var(--color-cream);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 22px;
+}
+.process {
+  background: var(--color-wine);
+  border-bottom: var(--border-fine);
+  padding: 26px var(--page-gutter) 24px;
+}
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 42px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.step {
+  display: flex;
+  align-items: start;
+  gap: 16px;
+}
+.icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-gold);
+  border-radius: 50%;
+  color: var(--color-gold);
+}
+.label {
+  color: var(--color-gold);
+  font-size: 9px;
+  letter-spacing: .05em;
+  margin-bottom: 4px;
+}
+.step h2 {
+  font-size: 19px;
+  line-height: 1.3;
+  margin-bottom: 5px;
+}
+.stepText {
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.experiences {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  padding: 24px var(--page-gutter);
+}
+.card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 198px;
+  display: flex;
+  align-items: end;
+  border: var(--border-fine);
+  border-radius: var(--radius-small);
+  background: var(--color-wine);
+}
+.cardImage {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.card::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(180deg, rgb(22 12 10 / 12%) 15%, rgb(22 12 10 / 38%) 50%, rgb(22 12 10 / 92%) 100%);
+}
+.cardText {
+  padding: 20px;
+}
+.card h2 {
+  font-size: 24px;
+  line-height: 1.2;
+}
+@media (min-width: 1400px) {
+  .hero {
+    min-height: 480px;
+  }
+}
+@media (max-width: 900px) {
+  .steps {
+    gap: 24px;
+  }
+  .step {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .experiences {
+    gap: 16px;
+  }
+  .cardText {
+    padding: 16px;
+  }
+  .card h2 {
+    font-size: 21px;
+  }
+}
+@media (max-width: 600px) {
+  .hero {
+    padding-top: 100px;
+  }
+  .heroImage {
+    object-position: 58% top;
+  }
+  .description {
+    font-size: 15px;
+  }
+  .buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .steps, .experiences {
+    grid-template-columns: 1fr;
+  }
+  .step {
+    flex-direction: row;
+    gap: 16px;
+  }
+  .stepText {
+    font-size: 14px;
+  }
+  .label {
+    font-size: 10px;
+  }
+  .process {
+    padding-block: 32px;
+  }
+  .card {
+    min-height: 210px;
+  }
+}
