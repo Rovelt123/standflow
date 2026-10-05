@@ -1,5 +1,6 @@
 package app.server;
 
+import app.controllers.ApplicationController;
 import app.controllers.TemplateController;
 import io.javalin.apibuilder.EndpointGroup;
 
@@ -12,6 +13,7 @@ public class Routing {
         return () -> {
             path("/api", () -> {
                 TemplateController.registerRoutes().addEndpoints();
+                ApplicationController.registerRoutes().addEndpoints();
 
                 get("/health", ctx -> ctx.result("Health OK"));
             });
