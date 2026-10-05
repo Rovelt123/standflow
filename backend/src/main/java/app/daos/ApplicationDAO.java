@@ -13,15 +13,13 @@ public class ApplicationDAO extends EntityManagerDAO<Application> {
 
     //--------------------------------------------------------------
 
-    @Override
-    public Application create(Application application) {
+    public Application createApplication(Application application) {
         synchronized (em) {
-            // A receipt must never be returned for an uncommitted outer transaction.
             if (em.getTransaction().isActive()) {
                 throw new ApiException(500, "Ansøgningen kunne ikke gemmes.");
             }
             try {
-                return super.create(application);
+                return create(application);
             } catch (RuntimeException exception) {
                 em.clear();
                 throw new ApiException(500, "Ansøgningen kunne ikke gemmes.");

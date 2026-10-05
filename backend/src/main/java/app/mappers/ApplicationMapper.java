@@ -1,39 +1,57 @@
 package app.mappers;
 
-import app.dtos.ApplicationRequestDTO;
-import app.dtos.ApplicationResponseDTO;
+import app.dtos.ApplicationDTO;
 import app.entities.Application;
 import app.enums.ApplicationStandType;
 import app.enums.ApplicationStatus;
+import app.mappers.generic.IMapper;
+import app.utils.ErrorHandler;
 
-import java.time.LocalDate;
+public class ApplicationMapper implements IMapper<Application, ApplicationDTO> {
 
-public class ApplicationMapper {
-
-    public Application toEntity(ApplicationRequestDTO request, LocalDate createdAt) {
-        Application application = new Application();
-        application.setCompany(request.company());
-        application.setContact(request.contact());
-        application.setCvr(request.cvr());
-        application.setEmail(request.email());
-        application.setPhone(request.phone());
-        application.setAddress(request.address());
-        application.setCity(request.city());
-        application.setWebsite(request.website());
-        application.setProducts(request.products());
-        application.setPreviousExhibitor(request.previousExhibitor());
-        application.setStandType(ApplicationStandType.valueOf(request.standType()));
-        application.setTables(request.tables());
-        application.setChairs(request.chairs());
-        application.setStatus(ApplicationStatus.PENDING);
-        application.setCreatedAt(createdAt);
-        return application;
+    @Override
+    public Application toEntity(ApplicationDTO dto) {
+        return Application.builder()
+                .id(dto.getId())
+                .company(dto.getCompany())
+                .contact(dto.getContact())
+                .cvr(dto.getCvr())
+                .email(dto.getEmail())
+                .phone(dto.getPhone())
+                .address(dto.getAddress())
+                .city(dto.getCity())
+                .website(dto.getWebsite())
+                .products(dto.getProducts())
+                .previousExhibitor(dto.getPreviousExhibitor())
+                .standType(ErrorHandler.tryParseEnum(ApplicationStandType.class, dto.getStandType(), "Ugyldig standtype."))
+                .tables(dto.getTables())
+                .chairs(dto.getChairs())
+                .status(ErrorHandler.tryParseEnum(ApplicationStatus.class, dto.getStatus(), "Ugyldig status."))
+                .createdAt(ErrorHandler.tryParseLocalDate(dto.getCreatedAt(), "Ugyldig oprettelsesdato."))
+                .build();
     }
 
     //--------------------------------------------------------------
 
-    public ApplicationResponseDTO toDTO(Application application) {
-        return new ApplicationResponseDTO(application.getId(), application.getStatus(),
-                application.getCreatedAt().toString());
+    @Override
+    public ApplicationDTO toDTO(Application entity) {
+        return ApplicationDTO.builder()
+                .id(entity.getId())
+                .company(entity.getCompany())
+                .contact(entity.getContact())
+                .cvr(entity.getCvr())
+                .email(entity.getEmail())
+                .phone(entity.getPhone())
+                .address(entity.getAddress())
+                .city(entity.getCity())
+                .website(entity.getWebsite())
+                .products(entity.getProducts())
+                .previousExhibitor(entity.isPreviousExhibitor())
+                .standType(entity.getStandType().name())
+                .tables(entity.getTables())
+                .chairs(entity.getChairs())
+                .status(entity.getStatus().name())
+                .createdAt(entity.getCreatedAt().toString())
+                .build();
     }
 }

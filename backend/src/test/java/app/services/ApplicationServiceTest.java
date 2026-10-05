@@ -79,55 +79,6 @@ class ApplicationServiceTest extends ApplicationTestSupport {
     //--------------------------------------------------------------
 
     @Test
-    void sendsGeneratedPdfAfterValidApplicationIsSaved() throws Exception {
-        var receipt = service.create(request(validBody()));
-
-        assertNotNull(receipt.id());
-        assertEquals(1, pdfGenerator.calls());
-        assertEquals(1, emailService.calls());
-        assertArrayEquals("%PDF-1.4 test".getBytes(), emailService.lastAttachment());
-        assertEquals("application-" + receipt.id() + ".pdf", emailService.lastFilename());
-    }
-
-    //--------------------------------------------------------------
-
-    @Test
-    void doesNotGeneratePdfOrSendEmailWhenValidationFails() throws Exception {
-        assertInvalid(validBody().put("email", "invalid"));
-
-        assertEquals(0, pdfGenerator.calls());
-        assertEquals(0, emailService.calls());
-    }
-
-    //--------------------------------------------------------------
-
-    @Test
-    void doesNotSendEmailWhenPdfGenerationFails() throws Exception {
-        pdfGenerator.failWith(new ApiException(500, "pdf failed"));
-
-        ApiException error = assertThrows(ApiException.class, () -> service.create(request(validBody())));
-
-        assertEquals(500, error.getStatus());
-        assertEquals(1, pdfGenerator.calls());
-        assertEquals(0, emailService.calls());
-    }
-
-    //--------------------------------------------------------------
-
-    @Test
-    void handlesEmailFailureWithApiException() throws Exception {
-        emailService.failWith(new ApiException(500, "email failed"));
-
-        ApiException error = assertThrows(ApiException.class, () -> service.create(request(validBody())));
-
-        assertEquals(500, error.getStatus());
-        assertEquals(1, pdfGenerator.calls());
-        assertEquals(1, emailService.calls());
-    }
-
-    //--------------------------------------------------------------
-
-    @Test
     void validatesPhoneEmailCityAndWebsiteVariants() throws Exception {
         for (String phone : new String[]{"1234567", "1234567890123456", "12+345678", "1234/5678"}) {
             assertInvalid(validBody().put("phone", phone));

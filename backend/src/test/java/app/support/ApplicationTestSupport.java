@@ -3,8 +3,6 @@ package app.support;
 import app.daos.ApplicationDAO;
 import app.dtos.ApplicationRequestDTO;
 import app.entities.Application;
-import app.services.ApplicationEmailService;
-import app.services.ApplicationPdfGenerator;
 import app.services.ApplicationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -27,8 +25,6 @@ public abstract class ApplicationTestSupport {
     protected EntityManager em;
     protected ApplicationDAO dao;
     protected ApplicationService service;
-    protected RecordingPdfGenerator pdfGenerator;
-    protected RecordingEmailService emailService;
     protected final AtomicReference<ApplicationService.IntakeStatus> intake =
             new AtomicReference<>(new ApplicationService.IntakeStatus(true, null));
     protected final Clock clock = Clock.fixed(Instant.parse("2026-10-05T23:30:00Z"),
@@ -44,9 +40,7 @@ public abstract class ApplicationTestSupport {
                 .buildSessionFactory();
         em = emf.createEntityManager();
         dao = new ApplicationDAO(em);
-        pdfGenerator = new RecordingPdfGenerator();
-        emailService = new RecordingEmailService();
-        service = new ApplicationService(dao, intake::get, clock, pdfGenerator, emailService);
+        service = new ApplicationService(dao, intake::get, clock);
     }
 
     //--------------------------------------------------------------
@@ -95,77 +89,6 @@ public abstract class ApplicationTestSupport {
     protected long countApplications() {
         try (EntityManager reader = emf.createEntityManager()) {
             return reader.createQuery("select count(a) from Application a", Long.class).getSingleResult();
-        }
-    }
-
-    //--------------------------------------------------------------
-
-    protected static class RecordingPdfGenerator implements ApplicationPdfGenerator {
-        private int calls;
-        private RuntimeException failure;
-
-        @Override
-        public byte[] generate(Application application) {
-            calls++;
-            if (failure != null) {
-                throw failure;
-            }
-            return "%PDF-1.4 test".getBytes();
-        }
-
-        //--------------------------------------------------------------
-
-        public int calls() {
-            return calls;
-        }
-
-        //--------------------------------------------------------------
-
-        public void failWith(RuntimeException failure) {
-            this.failure = failure;
-        }
-    }
-
-    //--------------------------------------------------------------
-
-    protected static class RecordingEmailService implements ApplicationEmailService {
-        private int calls;
-        private byte[] lastAttachment;
-        private String lastFilename;
-        private RuntimeException failure;
-
-        @Override
-        public void sendApplication(Application application, byte[] pdfAttachment, String attachmentFilename) {
-            calls++;
-            if (failure != null) {
-                throw failure;
-            }
-            lastAttachment = pdfAttachment;
-            lastFilename = attachmentFilename;
-        }
-
-        //--------------------------------------------------------------
-
-        public int calls() {
-            return calls;
-        }
-
-        //--------------------------------------------------------------
-
-        public byte[] lastAttachment() {
-            return lastAttachment;
-        }
-
-        //--------------------------------------------------------------
-
-        public String lastFilename() {
-            return lastFilename;
-        }
-
-        //--------------------------------------------------------------
-
-        public void failWith(RuntimeException failure) {
-            this.failure = failure;
         }
     }
 }
