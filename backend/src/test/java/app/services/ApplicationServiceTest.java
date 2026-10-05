@@ -33,7 +33,7 @@ class ApplicationServiceTest extends ApplicationTestSupport {
         assertEquals(0, countApplications());
         ObjectNode maximum = validBody();
         maximumValues.forEach(maximum::put);
-        assertNotNull(service.create(request(maximum)).id());
+        assertNotNull(service.create(request(maximum)).getId());
     }
 
     //--------------------------------------------------------------
@@ -68,12 +68,61 @@ class ApplicationServiceTest extends ApplicationTestSupport {
             ObjectNode body = validBody().put("standType", code).put("tables", 0).put("chairs", 100);
             body.remove("website");
             var receipt = service.create(request(body));
-            assertEquals("2026-10-05", receipt.createdAt());
-            assertNull(dao.getById(receipt.id()).getWebsite());
+            assertEquals(LocalDate.of(2026, 10, 5), receipt.getCreatedAt());
+            assertNull(dao.getById(receipt.getId()).getWebsite());
         }
         var receipt = service.create(request(validBody().put("website", "  ")));
-        assertNull(dao.getById(receipt.id()).getWebsite());
+        assertNull(dao.getById(receipt.getId()).getWebsite());
         assertEquals(9, countApplications());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void sendsGeneratedPdfAfterValidApplicationIsSaved() throws Exception {
+        var receipt = service.create(request(validBody()));
+
+        assertNotNull(receipt.getId());
+        assertEquals(1, pdfGenerator.calls());
+        assertEquals(1, emailService.calls());
+        assertArrayEquals("%PDF-1.4 test".getBytes(), emailService.lastAttachment());
+        assertEquals("application-" + receipt.getId() + ".pdf", emailService.lastFilename());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void doesNotGeneratePdfOrSendEmailWhenValidationFails() throws Exception {
+        assertInvalid(validBody().put("email", "invalid"));
+
+        assertEquals(0, pdfGenerator.calls());
+        assertEquals(0, emailService.calls());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void doesNotSendEmailWhenPdfGenerationFails() throws Exception {
+        pdfGenerator.failWith(new ApiException(500, "pdf failed"));
+
+        ApiException error = assertThrows(ApiException.class, () -> service.create(request(validBody())));
+
+        assertEquals(500, error.getStatus());
+        assertEquals(1, pdfGenerator.calls());
+        assertEquals(0, emailService.calls());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void handlesEmailFailureWithApiException() throws Exception {
+        emailService.failWith(new ApiException(500, "email failed"));
+
+        ApiException error = assertThrows(ApiException.class, () -> service.create(request(validBody())));
+
+        assertEquals(500, error.getStatus());
+        assertEquals(1, pdfGenerator.calls());
+        assertEquals(1, emailService.calls());
     }
 
     //--------------------------------------------------------------
@@ -96,9 +145,9 @@ class ApplicationServiceTest extends ApplicationTestSupport {
         assertEquals(0, countApplications());
         String maximumWebsite = "https://example.dk/" + "x".repeat(236);
         var receipt = service.create(request(validBody().put("website", maximumWebsite)));
-        assertEquals(maximumWebsite, dao.getById(receipt.id()).getWebsite());
+        assertEquals(maximumWebsite, dao.getById(receipt.getId()).getWebsite());
         var noWebsite = service.create(request(validBody().putNull("website")));
-        assertNull(dao.getById(noWebsite.id()).getWebsite());
+        assertNull(dao.getById(noWebsite.getId()).getWebsite());
         assertEquals(400, assertThrows(ApiException.class, () -> service.create(null)).getStatus());
     }
 

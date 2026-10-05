@@ -1,20 +1,26 @@
 package app.services;
 
 import app.daos.ApplicationDAO;
-import app.dtos.ApplicationRequestDTO;
-import app.dtos.ApplicationResponseDTO;
+import app.dtos.ApplicationDTO;
 import app.entities.Application;
 import app.exceptions.ApiException;
 import app.mappers.ApplicationMapper;
+import app.server.Setup;
+import app.utils.ErrorHandler;
 
 import java.net.URI;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Supplier;
 
 public class ApplicationService {
+
+    private static final Set<String> TEXT_FIELDS = Set.of("company", "contact", "cvr", "email",
+            "phone", "address", "city", "website", "products", "standType");
 
     private final ApplicationDAO applicationDAO;
     private final Supplier<IntakeStatus> intakeStatus;
@@ -25,6 +31,12 @@ public class ApplicationService {
 
     /** Supplied by the separate administration feature; dates never open intake automatically. */
     public record IntakeStatus(boolean open, LocalDate nextOpeningDate) {
+    }
+
+    //--------------------------------------------------------------
+
+    public ApplicationService() {
+        this(new ApplicationDAO(Setup.em), () -> new IntakeStatus(true, null));
     }
 
     //--------------------------------------------------------------
@@ -55,22 +67,19 @@ public class ApplicationService {
 
     public Application create(ApplicationDTO request) {
         requireOpenIntake();
-        ApplicationRequestDTO normalized = validate(request);
-        Application application = mapper.toEntity(normalized, LocalDate.now(clock));
-        Application saved;
         ApplicationDTO normalized = validate(request);
         normalized.setStatus("PENDING");
         normalized.setCreatedAt(LocalDate.now(clock).toString());
         Application application = mapper.toEntity(normalized);
+        Application saved;
         try {
-            saved = applicationDAO.create(application);
-            return applicationDAO.createApplication(application);
+            saved = applicationDAO.createApplication(application);
         } catch (RuntimeException exception) {
             throw new ApiException(500, "Ansøgningen kunne ikke gemmes.");
         }
         byte[] pdf = pdfGenerator.generate(saved);
         emailService.sendApplication(saved, pdf, pdfGenerator.filename(saved));
-        return mapper.toDTO(saved);
+        return saved;
     }
 
     //--------------------------------------------------------------
