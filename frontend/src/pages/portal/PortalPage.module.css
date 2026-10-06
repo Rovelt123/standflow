@@ -1,0 +1,36 @@
+.page { min-height: calc(100vh - 74px); padding: 48px var(--page-gutter) 80px; background: var(--color-application-background); color: var(--color-ink); }
+.container { max-width: 1100px; margin: auto; }
+.heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 24px; }
+.heading h1 { font-size: clamp(30px, 4vw, 44px); }
+.heading p, .card > p { color: var(--color-ink-muted); }
+.eyebrow { color: var(--color-terracotta); text-transform: uppercase; font-size: 12px; letter-spacing: .12em; }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--color-paper-border); padding-bottom: 16px; margin: 24px 0 32px; }
+.page button, .button { padding: 11px 18px; border: 1px solid var(--color-burgundy); border-radius: 4px; background: var(--color-burgundy); color: var(--color-cream); font: inherit; text-decoration: none; cursor: pointer; }
+.page button.secondary, .tabs button { background: transparent; color: var(--color-burgundy); }
+.tabs button[aria-current] { background: var(--color-burgundy); color: var(--color-cream); }
+.page button:disabled { opacity: .55; cursor: not-allowed; }
+.page :focus-visible { outline: 2px solid var(--color-terracotta); outline-offset: 4px; }
+.list, .settings { display: grid; gap: 24px; }
+.card { padding: clamp(20px, 4vw, 32px); border: 1px solid var(--color-paper-border); border-radius: 6px; background: var(--color-white); }
+.card h2, .card h3 { margin: 0 0 10px; }
+.card h3 { font-weight: normal; font-size: 23px; }
+.actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+.status { display: inline-block; padding: 6px 12px; border-radius: 20px; background: var(--color-application-panel); font-size: 14px; }
+.ACCEPTED { background: #e9f0e4; color: #35532e; }
+.REJECTED { background: #fae7e7; color: var(--color-danger); }
+.INFO_REQUESTED { background: #fff0d0; color: #754b06; }
+.details { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.details dt { color: var(--color-ink-muted); font-size: 13px; }
+.details dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.card summary { cursor: pointer; padding: 12px 0; color: var(--color-burgundy); }
+.notice, .confirm { padding: 16px; margin: 16px 0; background: var(--color-application-panel); }
+.error { padding: 16px; margin-bottom: 20px; color: var(--color-danger); border: 1px solid var(--color-danger); }
+.form { display: grid; gap: 18px; margin: 20px 0 0; padding: 0; border: 0; min-width: 0; }
+.form label { display: grid; gap: 6px; }
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.form input, .form textarea { box-sizing: border-box; width: 100%; padding: 11px; border: 1px solid var(--color-paper-border); border-radius: 4px; font: inherit; background: var(--color-white); color: var(--color-ink); }
+.form .check { display: flex; align-items: flex-start; gap: 10px; }
+.check input { width: auto; margin-top: 5px; flex-shrink: 0; }
+.form button { justify-self: start; }
+.danger { border-color: var(--color-danger); }
+@media(max-width: 600px) { .details, .fields { grid-template-columns: 1fr; } .page { padding-top: 28px; } .tabs button { flex: 1; } }

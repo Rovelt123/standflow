@@ -1,8 +1,8 @@
 package app.security;
 
-import app.Main;
 import app.daos.UserDAO;
 import app.dtos.UserDTO;
+import app.entities.User;
 import app.mappers.UserMapper;
 import app.server.Setup;
 import com.nimbusds.jose.*;
@@ -27,7 +27,9 @@ public class JWTTokenGenerator {
             .subject(user.getEmail())
             .issuer(issuer)
             .claim("email", user.getEmail())
-            .expirationTime(new Date((new Date()).getTime() + (long)Integer.parseInt(expireMillis)))
+            .claim("userId", user.getId().toString())
+            .claim("tokenVersion", user.getTokenVersion())
+            .expirationTime(new Date(Math.addExact(System.currentTimeMillis(), Long.parseLong(expireMillis))))
             .build();
 
         Payload payload = new Payload(claims.toJSONObject());
@@ -59,6 +61,13 @@ public class JWTTokenGenerator {
     public static UserDTO getUserFromToken(String token) throws ParseException {
         SignedJWT signedJWT = SignedJWT.parse(token);
         String email = signedJWT.getJWTClaimsSet().getStringClaim("email");
-        return mapper.toDTO(userDAO.getByEmail(email));
+        User user = userDAO.getByEmail(email);
+        String userId = signedJWT.getJWTClaimsSet().getStringClaim("userId");
+        Integer version = signedJWT.getJWTClaimsSet().getIntegerClaim("tokenVersion");
+        if (user == null || !user.getId().toString().equals(userId)
+                || version == null || version != user.getTokenVersion()) {
+            return null;
+        }
+        return mapper.toDTO(user);
     }
 }

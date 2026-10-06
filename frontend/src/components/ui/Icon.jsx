@@ -7,6 +7,7 @@ const iconPaths = {
 }
 
 function Icon({ name }) {
+  if (name === 'user') return <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="7" r="5" /><path d="M3 22v-3a9 7 0 0 1 18 0v3z" /></svg>
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d={iconPaths[name]} />

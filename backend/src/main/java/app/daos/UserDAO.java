@@ -36,4 +36,15 @@ public class UserDAO extends EntityManagerDAO<User> {
             }
         }
     }
+
+    //--------------------------------------------------------------
+
+    public void deleteAccount(User user) {
+        executeQuery(() -> {
+            em.createQuery("delete from Application a where a.userId = :userId")
+                    .setParameter("userId", user.getId()).executeUpdate();
+            em.remove(em.contains(user) ? user : em.merge(user));
+            return null;
+        });
+    }
 }

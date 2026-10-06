@@ -1,18 +1,25 @@
+import { clearAuth, getAuthToken } from '../public/authApi.js'
+
 const apiBaseUrl = (import.meta.env?.VITE_API_BASE_URL
   || (import.meta.env?.DEV ? 'http://localhost:9393/api' : '/api')).replace(/\/+$/, '')
 
 export async function submitApplication(application, fetchRequest = fetch) {
+  const token = getAuthToken()
   let response
   try {
     response = await fetchRequest(`${apiBaseUrl}/applications`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify(application),
     })
   } catch {
     throw new Error('Forbindelsen blev afbrudt. Vi kan ikke bekræfte, om ansøgningen blev modtaget. Dine oplysninger er bevaret.')
   }
 
+  if (response.status === 401 || response.status === 403) {
+    clearAuth()
+    throw new Error('Din session er udløbet. Log ind igen for at sende ansøgningen. Dine oplysninger er bevaret.')
+  }
   if (response.status === 400 || response.status === 409) {
     const message = await response.text().catch(() => '')
     throw new Error(message || 'Ansøgningen kunne ikke sendes. Kontrollér oplysningerne, og prøv igen.')
