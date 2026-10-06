@@ -9,6 +9,7 @@ final class EntityRegistry {
     private EntityRegistry() {}
 
     static void registerEntities(Configuration configuration) {
-        //configuration.addAnnotatedClass(User.class);
+        configuration.addAnnotatedClass(User.class);
+        configuration.addAnnotatedClass(Application.class);
     }
 }

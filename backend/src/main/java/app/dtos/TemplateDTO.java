@@ -12,5 +12,7 @@ import java.util.UUID;
 public class TemplateDTO {
 
     private UUID id;
-
+    private String name;
+    private String subject;
+    private String body;
 }

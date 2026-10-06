@@ -1,28 +1,42 @@
 package app.services;
 
 import app.daos.ApplicationDAO;
-import app.dtos.ApplicationRequestDTO;
-import app.dtos.ApplicationResponseDTO;
+import app.dtos.ApplicationDTO;
 import app.entities.Application;
 import app.exceptions.ApiException;
 import app.mappers.ApplicationMapper;
+import app.server.Setup;
+import app.utils.ErrorHandler;
 
 import java.net.URI;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Supplier;
 
 public class ApplicationService {
 
+    private static final Set<String> TEXT_FIELDS = Set.of("company", "contact", "cvr", "email",
+            "phone", "address", "city", "website", "products", "standType");
+
     private final ApplicationDAO applicationDAO;
     private final Supplier<IntakeStatus> intakeStatus;
     private final Clock clock;
+    private final ApplicationPdfGenerator pdfGenerator;
+    private final ApplicationEmailService emailService;
     private final ApplicationMapper mapper = new ApplicationMapper();
 
     /** Supplied by the separate administration feature; dates never open intake automatically. */
     public record IntakeStatus(boolean open, LocalDate nextOpeningDate) {
+    }
+
+    //--------------------------------------------------------------
+
+    public ApplicationService() {
+        this(new ApplicationDAO(Setup.em), () -> new IntakeStatus(true, null));
     }
 
     //--------------------------------------------------------------
@@ -34,21 +48,62 @@ public class ApplicationService {
     //--------------------------------------------------------------
 
     public ApplicationService(ApplicationDAO applicationDAO, Supplier<IntakeStatus> intakeStatus, Clock clock) {
-        this.applicationDAO = Objects.requireNonNull(applicationDAO);
-        this.intakeStatus = Objects.requireNonNull(intakeStatus);
-        this.clock = Objects.requireNonNull(clock).withZone(ZoneOffset.UTC);
+        this(applicationDAO, intakeStatus, clock, new SimpleApplicationPdfGenerator(),
+                new GmailSmtpApplicationEmailService());
     }
 
     //--------------------------------------------------------------
 
-    public ApplicationResponseDTO create(ApplicationRequestDTO request) {
+    public ApplicationService(ApplicationDAO applicationDAO, Supplier<IntakeStatus> intakeStatus, Clock clock,
+                              ApplicationPdfGenerator pdfGenerator, ApplicationEmailService emailService) {
+        this.applicationDAO = Objects.requireNonNull(applicationDAO);
+        this.intakeStatus = Objects.requireNonNull(intakeStatus);
+        this.clock = Objects.requireNonNull(clock).withZone(ZoneOffset.UTC);
+        this.pdfGenerator = Objects.requireNonNull(pdfGenerator);
+        this.emailService = Objects.requireNonNull(emailService);
+    }
+
+    //--------------------------------------------------------------
+
+    public Application create(ApplicationDTO request) {
         requireOpenIntake();
-        ApplicationRequestDTO normalized = validate(request);
-        Application application = mapper.toEntity(normalized, LocalDate.now(clock));
+        ApplicationDTO normalized = validate(request);
+        normalized.setStatus("PENDING");
+        normalized.setCreatedAt(LocalDate.now(clock).toString());
+        Application application = mapper.toEntity(normalized);
+        Application saved;
         try {
-            return mapper.toDTO(applicationDAO.create(application));
+            saved = applicationDAO.createApplication(application);
         } catch (RuntimeException exception) {
             throw new ApiException(500, "Ansøgningen kunne ikke gemmes.");
+        }
+        byte[] pdf = pdfGenerator.generate(saved);
+        emailService.sendApplication(saved, pdf, pdfGenerator.filename(saved));
+        return saved;
+    }
+
+    //--------------------------------------------------------------
+
+    public void validateRequestFields(Map<String, ?> body) {
+        if (body == null) {
+            throw new ApiException(400, "Ansøgningen skal være et JSON-objekt.");
+        }
+        for (var field : body.entrySet()) {
+            String name = field.getKey();
+            Object value = field.getValue();
+            boolean valid;
+            if (TEXT_FIELDS.contains(name)) {
+                valid = value == null || value instanceof String;
+            } else if ("previousExhibitor".equals(name)) {
+                valid = value == null || value instanceof Boolean;
+            } else if ("tables".equals(name) || "chairs".equals(name)) {
+                valid = value == null || value instanceof Integer;
+            } else {
+                throw new ApiException(400, "Ansøgningen indeholder ukendte felter.");
+            }
+            if (!valid) {
+                throw new ApiException(400, "Ansøgningen indeholder en forkert felttype.");
+            }
         }
     }
 
@@ -74,19 +129,19 @@ public class ApplicationService {
 
     //--------------------------------------------------------------
 
-    private ApplicationRequestDTO validate(ApplicationRequestDTO request) {
+    private ApplicationDTO validate(ApplicationDTO request) {
         if (request == null) {
             throw new ApiException(400, "Ansøgningen skal være et JSON-objekt.");
         }
-        String company = requiredText(request.company(), "Virksomhedsnavn", 200);
-        String contact = requiredText(request.contact(), "Kontaktperson", 150);
-        String cvr = requiredText(request.cvr(), "CVR", 8);
-        String email = requiredText(request.email(), "E-mailadresse", 254);
-        String phone = requiredText(request.phone(), "Telefonnummer", 30);
-        String address = requiredText(request.address(), "Adresse", 255);
-        String city = requiredText(request.city(), "Postnr. og by", 150);
-        String products = requiredText(request.products(), "Produktbeskrivelse", 5000);
-        String standType = requiredText(request.standType(), "Standtype", 1);
+        String company = requiredText(request.getCompany(), "Virksomhedsnavn", 200);
+        String contact = requiredText(request.getContact(), "Kontaktperson", 150);
+        String cvr = requiredText(request.getCvr(), "CVR", 8);
+        String email = requiredText(request.getEmail(), "E-mailadresse", 254);
+        String phone = requiredText(request.getPhone(), "Telefonnummer", 30);
+        String address = requiredText(request.getAddress(), "Adresse", 255);
+        String city = requiredText(request.getCity(), "Postnr. og by", 150);
+        String products = requiredText(request.getProducts(), "Produktbeskrivelse", 5000);
+        String standType = requiredText(request.getStandType(), "Standtype", 1);
         if (!cvr.matches("[0-9]{8}")) {
             throw new ApiException(400, "CVR skal bestå af præcis 8 cifre.");
         }
@@ -103,23 +158,22 @@ public class ApplicationService {
         if (!standType.matches("[A-H]")) {
             throw new ApiException(400, "Standtype skal være A–H.");
         }
-        if (request.previousExhibitor() == null) {
+        if (request.getPreviousExhibitor() == null) {
             throw new ApiException(400, "Tidligere stadeholder skal angives som true eller false.");
         }
-        validateQuantity(request.tables(), "Antal borde");
-        validateQuantity(request.chairs(), "Antal stole");
-        return new ApplicationRequestDTO(company, contact, cvr, email, phone, address, city,
-                normalizeWebsite(request.website()), products, request.previousExhibitor(),
-                standType, request.tables(), request.chairs());
+        validateQuantity(request.getTables(), "Antal borde");
+        validateQuantity(request.getChairs(), "Antal stole");
+        return ApplicationDTO.builder()
+                .company(company).contact(contact).cvr(cvr).email(email).phone(phone)
+                .address(address).city(city).website(normalizeWebsite(request.getWebsite()))
+                .products(products).previousExhibitor(request.getPreviousExhibitor()).standType(standType)
+                .tables(request.getTables()).chairs(request.getChairs()).build();
     }
 
     //--------------------------------------------------------------
 
     private String requiredText(String value, String label, int maximumLength) {
-        if (value == null || value.isBlank()) {
-            throw new ApiException(400, label + " skal udfyldes.");
-        }
-        String normalized = value.strip();
+        String normalized = ErrorHandler.tryString(value, label + " skal udfyldes.").strip();
         if (normalized.length() > maximumLength) {
             throw new ApiException(400, label + " må højst være " + maximumLength + " tegn.");
         }
