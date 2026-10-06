@@ -1,4 +1,3 @@
-import PublicHeader from '../../components/layout/PublicHeader.jsx'
 import Button from '../../components/ui/Button.jsx'
 import Icon from '../../components/ui/Icon.jsx'
 import styles from './LandingPage.module.css'
@@ -22,7 +21,7 @@ const experiences = [
 function LandingPage() {
   return (
     <>
-      <PublicHeader />
+      
       <main>
         <section className={styles.hero} aria-labelledby="landing-title">
           <img className={styles.heroImage} src={courtyardImage} alt="Sneklædt gårdsplads med bindingsværk, lyskæder og et stort oplyst juletræ" fetchPriority="high" />

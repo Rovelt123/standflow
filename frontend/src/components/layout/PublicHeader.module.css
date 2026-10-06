@@ -1,5 +1,7 @@
 .header {
-  min-height: 70px;
+  min-height: 74px;
+  background: var(--color-burgundy);
+  color: var(--color-cream);
   padding: 12px 40px;
   display: flex;
   align-items: center;
@@ -19,17 +21,6 @@
   font-family: var(--font-heading);
   line-height: .95;
   font-size: 16px;
-}
-.application {
-  min-height: 74px;
-}
-.application .navigation a {
-  font-size: 11px;
-  text-transform: uppercase;
-}
-.application .navigation a[aria-current] {
-  text-decoration: underline;
-  text-underline-offset: 9px;
 }
 .logo span + span {
   font-size: 12px;
@@ -66,6 +57,10 @@
   height: 16px;
   display: block;
 }
+.profile { display: grid; place-items: center; width: 42px; height: 42px; color: var(--color-cream); border: 1px solid var(--color-gold); border-radius: 50%; }
+.profile i { display: flex; }
+.profile[aria-current] { background: var(--color-wine); color: var(--color-gold); }
+.social:focus-visible, .profile:focus-visible { outline: 2px solid var(--color-gold); outline-offset: 4px; }
 @media (max-width: 1000px) {
   .header {
     flex-wrap: wrap;

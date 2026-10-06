@@ -3,6 +3,7 @@ package app.services;
 import app.daos.ApplicationDAO;
 import app.dtos.ApplicationDTO;
 import app.entities.Application;
+import app.enums.ApplicationStatus;
 import app.exceptions.ApiException;
 import app.mappers.ApplicationMapper;
 import app.server.Setup;
@@ -13,6 +14,8 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Map;
+import java.util.List;
+import java.util.UUID;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -66,11 +69,18 @@ public class ApplicationService {
     //--------------------------------------------------------------
 
     public Application create(ApplicationDTO request) {
+        return create(request, null);
+    }
+
+    //--------------------------------------------------------------
+
+    public Application create(ApplicationDTO request, UUID userId) {
         requireOpenIntake();
         ApplicationDTO normalized = validate(request);
         normalized.setStatus("PENDING");
         normalized.setCreatedAt(LocalDate.now(clock).toString());
         Application application = mapper.toEntity(normalized);
+        application.setUserId(userId);
         Application saved;
         try {
             saved = applicationDAO.createApplication(application);
@@ -105,6 +115,104 @@ public class ApplicationService {
                 throw new ApiException(400, "Ansøgningen indeholder en forkert felttype.");
             }
         }
+    }
+
+    //--------------------------------------------------------------
+
+    public List<Application> getAll() {
+        return applicationDAO.getAll();
+    }
+
+    //--------------------------------------------------------------
+
+    public List<Application> getOwn(UUID userId) {
+        return applicationDAO.getByUserId(userId);
+    }
+
+    //--------------------------------------------------------------
+
+    public Application getOwnById(UUID id, UUID userId) {
+        Application application = getById(id);
+        if (!userId.equals(application.getUserId())) {
+            throw new ApiException(404, "Ansøgningen findes ikke.");
+        }
+        return application;
+    }
+
+    //--------------------------------------------------------------
+
+    public Application updateOwn(UUID id, UUID userId, ApplicationDTO request) {
+        synchronized (applicationDAO) {
+            Application current = getOwnById(id, userId);
+            if (current.getStatus() != ApplicationStatus.INFO_REQUESTED) {
+                throw new ApiException(409, "Ansøgningen kan kun ændres, når der er efterspurgt oplysninger.");
+            }
+            ApplicationDTO normalized = validate(request);
+            normalized.setId(id);
+            normalized.setStatus("PENDING");
+            normalized.setCreatedAt(current.getCreatedAt().toString());
+            Application updated = mapper.toEntity(normalized);
+            updated.setUserId(userId);
+            updated.setInternalComment(current.getInternalComment());
+            return applicationDAO.update(updated);
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    public void deleteOwn(UUID id, UUID userId) {
+        synchronized (applicationDAO) {
+            applicationDAO.delete(getOwnById(id, userId));
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    public Application getById(UUID id) {
+        return ErrorHandler.tryEntity(applicationDAO.getById(id), "Ansøgningen findes ikke.");
+    }
+
+    //--------------------------------------------------------------
+
+    public Application updateStatus(UUID id, Map<String, ?> body) {
+        String value = adminField(body, "status");
+        ApplicationStatus status;
+        try {
+            status = ApplicationStatus.valueOf(value);
+        } catch (IllegalArgumentException exception) {
+            throw new ApiException(400, "Status skal være ACCEPTED, REJECTED eller INFO_REQUESTED.");
+        }
+        if (status == ApplicationStatus.PENDING) {
+            throw new ApiException(400, "Status skal være ACCEPTED, REJECTED eller INFO_REQUESTED.");
+        }
+        synchronized (applicationDAO) {
+            Application application = getById(id);
+            application.setStatus(status);
+            return applicationDAO.update(application);
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    public Application updateComment(UUID id, Map<String, ?> body) {
+        String comment = adminField(body, "comment");
+        if (comment.length() > 5000) {
+            throw new ApiException(400, "Intern kommentar må højst være 5000 tegn.");
+        }
+        synchronized (applicationDAO) {
+            Application application = getById(id);
+            application.setInternalComment(comment);
+            return applicationDAO.update(application);
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    private String adminField(Map<String, ?> body, String field) {
+        if (body == null || body.size() != 1 || !(body.get(field) instanceof String value)) {
+            throw new ApiException(400, "Request skal indeholde præcis feltet " + field + " som tekst.");
+        }
+        return value;
     }
 
     //--------------------------------------------------------------

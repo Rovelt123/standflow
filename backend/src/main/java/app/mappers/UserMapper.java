@@ -2,15 +2,7 @@ package app.mappers;
 
 import app.dtos.UserDTO;
 import app.entities.User;
-import app.enums.Role;
 import app.mappers.generic.IMapper;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import jakarta.persistence.*;
-import lombok.Builder;
-
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
 
 
 public class UserMapper implements IMapper<User, UserDTO> {
@@ -27,8 +19,16 @@ public class UserMapper implements IMapper<User, UserDTO> {
                 .phone(dto.getPhone())
                 .address(dto.getAddress())
                 .city(dto.getCity())
+                .acceptTerms(dto.isAcceptTerms())
+                .acceptPrivacy(dto.isAcceptPrivacy())
+                .acceptMarketing(dto.isAcceptMarketing())
+                .emailNotifications(dto.isEmailNotifications())
+                .tokenVersion(dto.getTokenVersion())
+                .roles(dto.getRoles())
                 .build();
     }
+
+    //--------------------------------------------------------------
 
     @Override
     public UserDTO toDTO(User entity) {
@@ -42,6 +42,12 @@ public class UserMapper implements IMapper<User, UserDTO> {
                 .phone(entity.getPhone())
                 .address(entity.getAddress())
                 .city(entity.getCity())
+                .acceptTerms(entity.isAcceptTerms())
+                .acceptPrivacy(entity.isAcceptPrivacy())
+                .acceptMarketing(entity.isAcceptMarketing())
+                .emailNotifications(entity.isEmailNotifications())
+                .tokenVersion(entity.getTokenVersion())
+                .roles(entity.getRoles())
                 .build();
     }
 }

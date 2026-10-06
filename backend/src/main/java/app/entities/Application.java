@@ -2,6 +2,7 @@ package app.entities;
 
 import app.enums.ApplicationStandType;
 import app.enums.ApplicationStatus;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -10,27 +11,27 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.Builder;
-import lombok.AllArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDate;
 import java.util.UUID;
 
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Entity
 @Table(name = "applications")
 @Getter
 @Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class Application {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+
+    @JsonIgnore
+    @Column(name = "user_id", updatable = false)
+    private UUID userId;
 
     @Column(nullable = false, length = 200)
     private String company;
@@ -75,6 +76,10 @@ public class Application {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ApplicationStatus status;
+
+    @JsonIgnore
+    @Column(name = "internal_comment", length = 5000)
+    private String internalComment;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDate createdAt;
