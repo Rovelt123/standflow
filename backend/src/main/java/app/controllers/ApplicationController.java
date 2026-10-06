@@ -1,79 +1,85 @@
 package app.controllers;
 
-import app.dtos.ApplicationRequestDTO;
+import app.controllers.generic.BaseController;
+import app.daos.ApplicationDAO;
+import app.dtos.ApplicationDTO;
+import app.entities.Application;
 import app.enums.Role;
-import app.exceptions.ApiException;
+import app.mappers.ApplicationMapper;
+import app.server.Setup;
 import app.services.ApplicationService;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import app.utils.ErrorHandler;
 import io.javalin.apibuilder.EndpointGroup;
 import io.javalin.http.Context;
 
-import java.util.Objects;
-import java.util.Set;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
-import static io.javalin.apibuilder.ApiBuilder.post;
+import static io.javalin.apibuilder.ApiBuilder.*;
 
-public class ApplicationController {
+public class ApplicationController extends BaseController<Application, ApplicationDTO> {
 
-    private static final Set<String> TEXT_FIELDS = Set.of("company", "contact", "cvr", "email",
-            "phone", "address", "city", "website", "products", "standType");
-    private final ObjectMapper json = new ObjectMapper()
-            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-            .enable(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY);
-    private final ApplicationService service;
+    private final ApplicationDAO applicationDAO = new ApplicationDAO(Setup.em);
+    private final ApplicationMapper applicationMapper = new ApplicationMapper();
+    private final ApplicationService applicationService;
 
-    public ApplicationController(ApplicationService service) {
-        this.service = Objects.requireNonNull(service);
+    //--------------------------------------------------------------
+
+    public ApplicationController() {
+        this(new ApplicationService());
     }
 
     //--------------------------------------------------------------
 
-    /** Integration supplies the live administration status provider through the service. */
-    public static EndpointGroup registerRoutes(ApplicationService service) {
-        ApplicationController controller = new ApplicationController(service);
-        return () -> post("/applications", controller::create, Role.ANYONE);
+    public ApplicationController(ApplicationService applicationService) {
+        super(Application.class, new ApplicationMapper());
+        this.applicationService = applicationService;
+    }
+
+    //--------------------------------------------------------------
+
+    public static EndpointGroup registerRoutes() {
+        ApplicationController controller = new ApplicationController();
+        return () -> {
+            post("/applications", controller::create, Role.ANYONE);
+        };
+    }
+
+    //--------------------------------------------------------------
+
+    public static EndpointGroup registerRoutes(ApplicationService applicationService) {
+        ApplicationController controller = new ApplicationController(applicationService);
+        return () -> {
+            post("/applications", controller::create, Role.ANYONE);
+        };
+    }
+
+    //--------------------------------------------------------------
+
+    @Override
+    protected List<Application> getAllEntities() {
+        return applicationDAO.getAll();
+    }
+
+    //--------------------------------------------------------------
+
+    @Override
+    protected Application getEntityById(UUID id) {
+        return applicationDAO.getById(id);
     }
 
     //--------------------------------------------------------------
 
     public void create(Context ctx) {
-        ApplicationRequestDTO request = parseRequest(ctx.body());
-        ctx.status(201).json(service.create(request));
-    }
-
-    //--------------------------------------------------------------
-
-    private ApplicationRequestDTO parseRequest(String body) {
-        try {
-            JsonNode root = json.readTree(body);
-            if (root == null || !root.isObject()) {
-                throw new ApiException(400, "Ansøgningen skal være et JSON-objekt.");
-            }
-            var fields = root.fields();
-            while (fields.hasNext()) {
-                var field = fields.next();
-                String name = field.getKey();
-                JsonNode value = field.getValue();
-                boolean valid;
-                if (TEXT_FIELDS.contains(name)) {
-                    valid = value.isTextual() || value.isNull();
-                } else if ("previousExhibitor".equals(name)) {
-                    valid = value.isBoolean() || value.isNull();
-                } else if ("tables".equals(name) || "chairs".equals(name)) {
-                    valid = value.isNull() || (value.isIntegralNumber() && value.canConvertToInt());
-                } else {
-                    throw new ApiException(400, "Ansøgningen indeholder ukendte felter.");
-                }
-                if (!valid) {
-                    throw new ApiException(400, "Ansøgningen indeholder en forkert felttype.");
-                }
-            }
-            return json.treeToValue(root, ApplicationRequestDTO.class);
-        } catch (JsonProcessingException exception) {
-            throw new ApiException(400, "Ansøgningen indeholder ugyldig JSON.");
-        }
+        applicationService.validateRequestFields(
+                ErrorHandler.tryBodyMap(ctx, "Ansøgningen indeholder ugyldig JSON."));
+        ApplicationDTO request = ErrorHandler.tryBody(ctx, ApplicationDTO.class,
+                "Ansøgningen indeholder ugyldig JSON.");
+        ApplicationDTO saved = applicationMapper.toDTO(applicationService.create(request));
+        ctx.status(201).json(Map.of(
+                "id", saved.getId(),
+                "status", saved.getStatus(),
+                "createdAt", saved.getCreatedAt()));
     }
 }
