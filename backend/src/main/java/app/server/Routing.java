@@ -16,7 +16,7 @@ public class Routing {
                 TemplateController.registerRoutes().addEndpoints();
                 UserController.registerRoutes().addEndpoints();
                 ApplicationController.registerRoutes().addEndpoints();
-
+                MessageController.registerRoutes().addEndpoints();
                 get("/health", ctx -> ctx.result("Health OK"));
             });
         };
