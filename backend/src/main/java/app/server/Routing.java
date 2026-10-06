@@ -3,6 +3,7 @@ package app.server;
 import app.controllers.ApplicationController;
 import app.controllers.TemplateController;
 import app.controllers.UserController;
+import app.controllers.MessageController;
 import io.javalin.apibuilder.EndpointGroup;
 
 import static io.javalin.apibuilder.ApiBuilder.get;
