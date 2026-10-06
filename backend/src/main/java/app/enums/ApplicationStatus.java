@@ -1,5 +1,8 @@
 package app.enums;
 
 public enum ApplicationStatus {
-    PENDING
+    PENDING,
+    ACCEPTED,
+    REJECTED,
+    INFO_REQUESTED
 }

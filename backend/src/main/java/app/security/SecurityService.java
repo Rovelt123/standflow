@@ -76,7 +76,7 @@ public class SecurityService implements ISecurityService {
     // Check if the user's roles contain any of the allowed roles
     public boolean authorize(User user, Set<RouteRole> allowedRoles) {
         if (user == null) {
-            throw new UnauthorizedResponse("You need to log in, dude!");
+            throw new UnauthorizedResponse("You need to log in!");
         }
 
         Set<Role> roles = user.getRoles();
@@ -92,11 +92,22 @@ public class SecurityService implements ISecurityService {
 
     @Override
     public String createToken(UserDTO user) {
+        return createToken(user, false);
+    }
+
+    //--------------------------------------------------------------
+
+    public String createToken(UserDTO user, boolean rememberMe) {
         try {
             
             String ISSUER = Utils.getPropertyValue("ISSUER", "config.properties");
             String TOKEN_EXPIRE_TIME = Utils.getPropertyValue("TOKEN_EXPIRE_TIME", "config.properties");
             String SECRET_KEY = Utils.getPropertyValue("SECRET_KEY", "config.properties");
+            if (rememberMe) {
+                long defaultLifetime = Long.parseLong(TOKEN_EXPIRE_TIME);
+                TOKEN_EXPIRE_TIME = Long.toString(Math.max(java.time.Duration.ofDays(30).toMillis(),
+                        Math.multiplyExact(defaultLifetime, 2)));
+            }
             
             return JWTTokenGenerator.createToken(user, ISSUER, TOKEN_EXPIRE_TIME, SECRET_KEY);
         } catch (Exception e) {

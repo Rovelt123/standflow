@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import PublicHeader from '../../components/layout/PublicHeader.jsx'
 import crafts from '../../assets/images/danish-crafts.jpg'
 import ornaments from '../../assets/images/christmas-ornaments.jpg'
 import treats from '../../assets/images/christmas-treats.jpg'
@@ -12,7 +11,7 @@ const categories = [
 ]
 
 export default function ExhibitorsPage() {
-  return <><PublicHeader /><main className={styles.page}><div className={styles.container}>
+  return <><main className={styles.page}><div className={styles.container}>
     <p className={styles.eyebrow}>Jul på Engestofte Gods</p>
     <h1>Mød vores stadeholdere</h1>
     <p className={styles.intro}>Glæd dig til et julemarked med håndværk, julepynt og gode smagsoplevelser. Årets stadeholdere bliver præsenteret her, når listen er klar.</p>

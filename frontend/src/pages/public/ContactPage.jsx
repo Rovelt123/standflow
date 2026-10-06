@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import PublicHeader from '../../components/layout/PublicHeader.jsx'
 import styles from './PublicPages.module.css'
 
 export default function ContactPage() {
   const [previewed, setPreviewed] = useState(false)
-  return <><PublicHeader /><main className={styles.page}><div className={styles.container}>
+  return <><main className={styles.page}><div className={styles.container}>
     <p className={styles.eyebrow}>Vi hører gerne fra dig</p><h1>Kontakt</h1>
     <p className={styles.intro}>Har du spørgsmål til julemarkedet eller en stand på Engestofte Gods?</p>
     <form className={`${styles.panel} ${styles.form}`} onSubmit={event => { event.preventDefault(); setPreviewed(true) }}>

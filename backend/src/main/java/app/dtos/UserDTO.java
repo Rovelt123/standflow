@@ -1,6 +1,7 @@
 package app.dtos;
 
 import app.enums.Role;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -19,5 +20,11 @@ public class UserDTO {
     private final String phone;
     private final String address;
     private final String city;
+    private final boolean acceptTerms;
+    private final boolean acceptPrivacy;
+    private final boolean acceptMarketing;
+    private final boolean emailNotifications;
+    @JsonIgnore
+    private final int tokenVersion;
     private final Set<Role> roles;
 }
