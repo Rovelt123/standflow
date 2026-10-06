@@ -1,4 +1,5 @@
 import styles from './AdminSidebar.module.css'
+import { NavLink } from 'react-router-dom'
 
 const iconPaths = {
   overview: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',
@@ -16,6 +17,7 @@ const navItems = [
   { label: 'Plantegning', icon: 'sitePlan' },
   { label: 'Økonomi', icon: 'economy' },
   { label: 'Indstillinger', icon: 'settings' },
+  { label: 'Beskeder', icon: 'economy', to: '/kontrolpanel/beskeder' },
 ]
 
 function AdminSidebar() {
@@ -24,12 +26,21 @@ function AdminSidebar() {
       <ul className={styles.list}>
         {navItems.map((item) => (
           <li key={item.label}>
-            <button type="button" aria-disabled="true" className={styles.item}>
-              <svg className={styles.icon} viewBox="0 0 24 24" aria-hidden="true">
-                <path d={iconPaths[item.icon]} />
-              </svg>
-              {item.label}
-            </button>
+            {item.to ? (
+              <NavLink to={item.to} className={styles.item}>
+                <svg className={styles.icon} viewBox="0 0 24 24" aria-hidden="true">
+                  <path d={iconPaths[item.icon]} />
+                </svg>
+                {item.label}
+              </NavLink>
+            ) : (
+              <button type="button" aria-disabled="true" className={styles.item}>
+                <svg className={styles.icon} viewBox="0 0 24 24" aria-hidden="true">
+                  <path d={iconPaths[item.icon]} />
+                </svg>
+                {item.label}
+              </button>
+            )}
           </li>
         ))}
       </ul>

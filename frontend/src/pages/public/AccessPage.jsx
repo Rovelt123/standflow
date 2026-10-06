@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styles from './PublicPages.module.css'
-import { authenticate } from './authApi.js'
+import { authenticate, getCurrentUser } from './authApi.js'
 
 export default function AccessPage({ register = false }) {
   const navigate = useNavigate()
@@ -30,7 +30,12 @@ export default function AccessPage({ register = false }) {
     setSubmitting(true)
     try {
       await authenticate(request, register)
-      navigate('/brugerportal', { replace: true })
+      const user = await getCurrentUser()
+
+      navigate(
+        user.roles?.includes('ADMIN') ? '/kontrolpanel' : '/brugerportal',
+        { replace: true }
+      )
     } catch (failure) {
       setError(failure.message)
     } finally {
