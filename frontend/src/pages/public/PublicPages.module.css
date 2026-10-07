@@ -24,3 +24,25 @@
 .card div { padding: 24px; }
 .card h2 { margin-bottom: 8px; }
 @media (max-width: 650px) { .fields, .cards { grid-template-columns: 1fr; } .page { padding-top: 36px; } }
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.pagination button {
+  padding: 8px 18px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
