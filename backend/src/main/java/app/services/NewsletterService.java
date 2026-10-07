@@ -216,10 +216,10 @@ public class NewsletterService {
 
     private String render(String text, User user) {
         return value(text)
-                .replace("{{firstname}}", value(user.getFirstname()))
-                .replace("{{lastname}}", value(user.getLastname()))
-                .replace("{{company}}", value(user.getCompany()))
-                .replace("{{email}}", value(user.getEmail()));
+                .replace("<Firstname>", value(user.getFirstname()))
+                .replace("<Lastname>", value(user.getLastname()))
+                .replace("<Company>", value(user.getCompany()))
+                .replace("<Email>", value(user.getEmail()));
     }
 
     //--------------------------------------------------------------

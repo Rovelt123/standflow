@@ -10,6 +10,8 @@ import { getAuthToken, subscribeAuth } from './pages/public/authApi.js'
 import PublicHeader from './components/layout/PublicHeader.jsx'
 import PortalPage from './pages/portal/PortalPage.jsx'
 import MessagesPage from './pages/kontrolpanel/MessagesPage.jsx'
+import NewsletterPage from './pages/kontrolpanel/NewsletterPage.jsx'
+import UnsubscribePage from './pages/public/UnsubscribePage.jsx'
 import RequireAdmin from './components/admin/RequireAdmin.jsx'
 
 function App() {
@@ -21,6 +23,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/stadeholdere" element={<ExhibitorsPage />} />
         <Route path="/kontakt" element={<ContactPage />} />
+        <Route path="/unsubscribe" element={<UnsubscribePage />} />
         <Route path="/login" element={<AccessPage key="login" />} />
         <Route path="/registrer" element={<AccessPage key="register" register />} />
         <Route path="/ansoegning" element={authenticated ? <ApplicationPage key="new" /> : <Navigate to="/login" replace />} />
@@ -28,6 +31,7 @@ function App() {
         <Route path="/brugerportal/ansoegninger/:id/rediger" element={authenticated ? <ApplicationPage key="edit" /> : <Navigate to="/login" replace />} />
         <Route path="/kontrolpanel" element={authenticated ? (<RequireAdmin> <KontrolpanelPage /> </RequireAdmin>) : (<Navigate to="/login" replace />)}/>
         <Route path="/kontrolpanel/beskeder" element={authenticated ? (<RequireAdmin> <MessagesPage /> </RequireAdmin>) : (<Navigate to="/login" replace />)}/>
+        <Route path="/kontrolpanel/nyhedsbrev" element={authenticated ? (<RequireAdmin> <NewsletterPage /> </RequireAdmin>) : (<Navigate to="/login" replace />)}/>
      </Routes>
     </BrowserRouter>
   )

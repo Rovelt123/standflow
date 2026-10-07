@@ -6,3 +6,5 @@ backend/.idea/vcs.xml
 
 target/
 .idea/
+
+backend/target/

@@ -22,7 +22,7 @@ export async function portalRequest(path, method = 'GET', body, fetchRequest = f
     clearAuth()
     throw new Error('Din session er udløbet. Log ind igen.')
   }
-  if (![200, 201, 204].includes(response.status)) {
+  if (![200, 201, 202, 204].includes(response.status)) {
     if ([400, 403, 404, 409].includes(response.status)) {
       throw new Error(await response.text() || 'Handlingen kunne ikke gennemføres.')
     }

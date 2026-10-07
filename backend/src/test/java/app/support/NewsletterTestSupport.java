@@ -108,8 +108,8 @@ public abstract class NewsletterTestSupport {
     protected void seedTemplate() {
         template = templateDAO.create(Template.builder()
                 .name("Newsletter")
-                .subject("Hej {{firstname}} {{lastname}}")
-                .body("Firma: {{company}}\nEmail: {{email}}")
+                .subject("Hej <Firstname> <Lastname>")
+                .body("Firma: <Company>\nEmail: <Email>")
                 .build());
     }
 
