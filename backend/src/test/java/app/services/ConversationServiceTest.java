@@ -45,7 +45,8 @@ class ConversationServiceTest extends MessageTestSupport {
         assertFalse(service.getThreads(admin.getId(), null).getFirst().isUnread());
         Message question = message(alice, admin, "New question", "Question", 1, false);
         service = new ConversationService(dao, java.time.Clock.fixed(
-                timestamp.plusMinutes(2).toInstant(java.time.ZoneOffset.UTC), java.time.ZoneOffset.UTC));
+                timestamp.plusMinutes(2).toInstant(java.time.ZoneOffset.UTC), java.time.ZoneOffset.UTC),
+                messageEmailService);
         MessageDTO reply = service.sendAdmin(admin.getId(), alice.getId(), Map.of("body", "Answer"));
         assertEquals("New question", reply.getSubject());
         assertEquals("Answer", service.getThreads(admin.getId(), null).getFirst().getLastMessage());
@@ -55,6 +56,38 @@ class ConversationServiceTest extends MessageTestSupport {
         assertFalse(reload(first.getId()).isRead());
         assertFalse(reload(reply.getId()).isRead());
         assertFalse(service.getThreads(admin.getId(), null).getFirst().isUnread());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void adminMessagesTriggerTransactionalNotificationWithoutMarketingConsent() {
+        alice.setAcceptMarketing(false);
+        new app.daos.UserDAO(em).update(alice);
+
+        MessageDTO first = service.sendAdmin(admin.getId(), alice.getId(),
+                Map.of("subject", "Welcome", "body", "Hello"));
+        service.sendCustomer(alice.getId(), Map.of("subject", "Customer", "body", "No notification"));
+
+        assertEquals(1, messageEmailService.calls());
+        assertEquals(alice.getId(), messageEmailService.lastRecipient().getId());
+        assertEquals(first.getId(), messageEmailService.lastMessage().getId());
+        assertEquals(2, countMessages());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void notificationFailureDoesNotCreateDuplicatePersistedMessages() {
+        messageEmailService.failWith(new ApiException(500, "Beskednotifikationen kunne ikke sendes via e-mail."));
+
+        ApiException failure = assertThrows(ApiException.class, () -> service.sendAdmin(admin.getId(), alice.getId(),
+                Map.of("subject", "Welcome", "body", "Hello")));
+
+        assertEquals(500, failure.getStatus());
+        assertEquals(1, messageEmailService.calls());
+        assertEquals(1, countMessages());
+        assertEquals(1, service.getThread(admin.getId(), alice.getId()).size());
     }
 
     //--------------------------------------------------------------

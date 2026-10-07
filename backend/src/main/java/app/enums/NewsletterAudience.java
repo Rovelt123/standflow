@@ -1,0 +1,10 @@
+package app.enums;
+
+public enum NewsletterAudience {
+    INDIVIDUAL,
+    CATEGORY,
+    NEW_STALLHOLDERS,
+    PREVIOUS_YEAR_STALLHOLDERS,
+    ALL_PREVIOUS_STALLHOLDERS,
+    ALL_APPLICANTS
+}

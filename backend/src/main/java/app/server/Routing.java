@@ -4,6 +4,7 @@ import app.controllers.ApplicationController;
 import app.controllers.TemplateController;
 import app.controllers.UserController;
 import app.controllers.MessageController;
+import app.controllers.NewsletterController;
 import io.javalin.apibuilder.EndpointGroup;
 
 import static io.javalin.apibuilder.ApiBuilder.get;
@@ -18,6 +19,7 @@ public class Routing {
                 UserController.registerRoutes().addEndpoints();
                 ApplicationController.registerRoutes().addEndpoints();
                 MessageController.registerRoutes().addEndpoints();
+                NewsletterController.registerRoutes().addEndpoints();
                 get("/health", ctx -> ctx.result("Health OK"));
             });
         };

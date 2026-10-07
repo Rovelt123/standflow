@@ -19,6 +19,7 @@ public class ConversationService {
     private final MessageDAO messageDAO;
     private final MessageMapper mapper = new MessageMapper();
     private final Clock clock;
+    private final MessageEmailService messageEmailService;
 
     //--------------------------------------------------------------
 
@@ -35,8 +36,15 @@ public class ConversationService {
     //--------------------------------------------------------------
 
     public ConversationService(MessageDAO messageDAO, Clock clock) {
+        this(messageDAO, clock, new GmailSmtpMessageEmailService());
+    }
+
+    //--------------------------------------------------------------
+
+    public ConversationService(MessageDAO messageDAO, Clock clock, MessageEmailService messageEmailService) {
         this.messageDAO = Objects.requireNonNull(messageDAO);
         this.clock = Objects.requireNonNull(clock);
+        this.messageEmailService = Objects.requireNonNull(messageEmailService);
     }
 
     //--------------------------------------------------------------
@@ -45,7 +53,8 @@ public class ConversationService {
         User customer = authenticatedCustomer(authenticatedId);
         User admin = chatAdmin();
         validateFields(request, Set.of("subject", "body"));
-        return save(customer, admin, requiredText(request, "subject", 200), requiredText(request, "body", 5000));
+        return mapper.toDTO(save(customer, admin, requiredText(request, "subject", 200),
+                requiredText(request, "body", 5000)));
     }
 
     //--------------------------------------------------------------
@@ -73,7 +82,9 @@ public class ConversationService {
         validateFields(request, conversation.isEmpty() ? Set.of("subject", "body") : Set.of("body"));
         String subject = conversation.isEmpty() ? requiredText(request, "subject", 200)
                 : conversation.getLast().getSubject();
-        return save(admin, customer, subject, requiredText(request, "body", 5000));
+        Message message = save(admin, customer, subject, requiredText(request, "body", 5000));
+        messageEmailService.sendAdminMessageNotification(customer, message);
+        return mapper.toDTO(message);
     }
 
     //--------------------------------------------------------------
@@ -125,14 +136,14 @@ public class ConversationService {
 
     //--------------------------------------------------------------
 
-    private MessageDTO save(User sender, User recipient, String subject, String body) {
+    private Message save(User sender, User recipient, String subject, String body) {
         Message message = mapper.toEntity(MessageDTO.builder()
                 .senderId(sender.getId()).recipientId(recipient.getId())
                 .subject(subject).body(body).createdAt(LocalDateTime.now(clock).toString()).read(false).build());
         message.setSender(sender);
         message.setRecipient(recipient);
         try {
-            return mapper.toDTO(messageDAO.create(message));
+            return messageDAO.create(message);
         } catch (RuntimeException exception) {
             throw new ApiException(500, "Beskeden kunne ikke gemmes.");
         }

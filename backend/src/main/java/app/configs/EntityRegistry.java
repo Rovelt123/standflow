@@ -12,5 +12,7 @@ final class EntityRegistry {
         configuration.addAnnotatedClass(User.class);
         configuration.addAnnotatedClass(Application.class);
         configuration.addAnnotatedClass(Message.class);
+        configuration.addAnnotatedClass(Template.class);
+        configuration.addAnnotatedClass(UnsubscribeToken.class);
     }
 }
