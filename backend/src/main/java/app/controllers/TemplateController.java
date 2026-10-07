@@ -61,13 +61,13 @@ public class TemplateController extends BaseController<Template, TemplateDTO> {
     public static EndpointGroup registerRoutes(TemplateService templateService) {
         TemplateController controller = new TemplateController(templateService);
         return () -> {
-            get("/template", controller::getAll, Role.USER);
-            get("/template/{id}", controller::getByID, Role.USER);
-            post("/template", controller::create, Role.USER);
-            put("/template/{id}", controller::update, Role.USER);
-            delete("/template/{id}", controller::deleteTemplate, Role.USER);
-            post("/template/{id}/render", controller::render, Role.USER);
-            post("/template/validate", controller::validate, Role.USER);
+            get("/template", controller::getAll, Role.ADMIN);
+            get("/template/{id}", controller::getByID, Role.ADMIN);
+            post("/template", controller::create, Role.ADMIN);
+            put("/template/{id}", controller::update, Role.ADMIN);
+            delete("/template/{id}", controller::deleteTemplate, Role.ADMIN);
+            post("/template/{id}/render", controller::render, Role.ADMIN);
+            post("/template/validate", controller::validate, Role.ADMIN);
         };
     }
 
