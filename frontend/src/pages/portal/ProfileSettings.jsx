@@ -1,7 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { clearAuth } from '../public/authApi.js'
-import { portalRequest, saveProfile } from './portalApi.js'
+import { deleteAccount, getMarketingConsent, saveProfile, unsubscribeMarketing, updateMarketingConsent } from './portalApi.js'
 import styles from './PortalPage.module.css'
 
 const fields = [
@@ -15,6 +14,38 @@ export default function ProfileSettings({ user, onUpdate }) {
   const [profile, setProfile] = useState(user)
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState(null)
+  const [marketingConsent, setMarketingConsent] = useState(null)
+  const [consentLoading, setConsentLoading] = useState(true)
+  const [consentFeedback, setConsentFeedback] = useState(null)
+  const [consentReload, setConsentReload] = useState(0)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    getMarketingConsent().then(consent => {
+      if (active) setMarketingConsent(consent)
+    }).catch(error => {
+      if (active) setConsentFeedback({ error: true, text: error.message })
+    }).finally(() => { if (active) setConsentLoading(false) })
+    return () => { active = false }
+  }, [consentReload])
+
+  //--------------------------------------------------------------
+
+  async function changeConsent(nextConsent, unsubscribe = false) {
+    if (busy || consentLoading || marketingConsent === null) return
+    setBusy(true)
+    setConsentFeedback(null)
+    try {
+      const consent = await (unsubscribe ? unsubscribeMarketing() : updateMarketingConsent(nextConsent))
+      setMarketingConsent(consent)
+      setConsentFeedback({ text: consent ? 'Du er tilmeldt marketing og nyhedsbreve.' : 'Du er afmeldt marketing og nyhedsbreve.' })
+    } catch (error) {
+      setConsentFeedback({ error: true, text: error.message })
+    } finally {
+      setBusy(false)
+    }
+  }
 
   //--------------------------------------------------------------
 
@@ -27,8 +58,9 @@ export default function ProfileSettings({ user, onUpdate }) {
     setFeedback(null)
     try {
       if (action === 'delete') {
-        await portalRequest('/users/me', 'DELETE', { currentPassword: body.currentPassword, confirmDelete: body.confirmDelete === 'on' })
-        clearAuth()
+        await deleteAccount(body.currentPassword, body.confirmDelete === 'on')
+        setProfile(null)
+        onUpdate(null)
         navigate('/', { replace: true })
       } else {
         if (action === 'password' && body.newPassword !== body.confirmPassword) throw new Error('De nye adgangskoder skal være ens.')
@@ -45,6 +77,8 @@ export default function ProfileSettings({ user, onUpdate }) {
       setBusy(false)
     }
   }
+
+  if (!profile) return null
 
   return <div className={styles.settings}>
     {feedback && <p role={feedback.error ? 'alert' : 'status'} className={feedback.error ? styles.error : styles.notice}>{feedback.text}</p>}
@@ -63,6 +97,21 @@ export default function ProfileSettings({ user, onUpdate }) {
         <button type="submit">Gem oplysninger</button>
       </fieldset>
     </form>
+    <section className={styles.card} aria-labelledby="marketing-heading" aria-busy={consentLoading}>
+      <h2 id="marketing-heading">Marketing og nyhedsbreve</h2>
+      <p>Dit samtykke gælder kun marketing og nyhedsbreve. E-mails om din konto og dine notifikationer ændres ikke.</p>
+      {consentLoading ? <p role="status">Henter dit samtykke…</p> : marketingConsent !== null &&
+        <p>Marketing er {marketingConsent ? 'tilmeldt' : 'afmeldt'}.</p>}
+      {consentFeedback && <p role={consentFeedback.error ? 'alert' : 'status'} className={consentFeedback.error ? styles.error : styles.notice}>{consentFeedback.text}</p>}
+      <fieldset className={styles.form} disabled={busy || consentLoading || marketingConsent === null}>
+        <label className={styles.check}><input type="checkbox" checked={marketingConsent === true}
+          onChange={event => changeConsent(event.target.checked)} />Jeg vil modtage marketing og nyhedsbreve</label>
+        <button type="button" className={styles.secondary} disabled={marketingConsent !== true}
+          onClick={() => changeConsent(false, true)}>Afmeld marketing</button>
+      </fieldset>
+      {consentFeedback?.error && <button type="button" className={styles.secondary} disabled={busy || consentLoading}
+        onClick={() => { setConsentLoading(true); setConsentFeedback(null); setConsentReload(current => current + 1) }}>Genindlæs samtykke</button>}
+    </section>
     <form className={styles.card} onSubmit={event => submit(event, 'password')}>
       <h2>Skift adgangskode</h2>
       <p>Brug 8–30 tegn med store og små bogstaver samt et specialtegn.</p>
@@ -73,13 +122,18 @@ export default function ProfileSettings({ user, onUpdate }) {
         <button type="submit">Skift adgangskode</button>
       </fieldset>
     </form>
-    <form className={`${styles.card} ${styles.danger}`} onSubmit={event => submit(event, 'delete')}>
+    <section className={`${styles.card} ${styles.danger}`}>
       <h2>Slet min bruger</h2><p>Din profil og alle dine ansøgninger slettes permanent fra portalen.</p>
-      <fieldset disabled={busy} className={styles.form}>
-        <label>Din nuværende adgangskode<input type="password" name="currentPassword" autoComplete="current-password" required /></label>
-        <label className={styles.check}><input type="checkbox" name="confirmDelete" required />Ved at tjekke denne boks af, accepterer du, at vi sletter din bruger og al data vil gå tabt. Dette kan ikke fortrydes!</label>
-        <button type="submit">Slet min bruger permanent</button>
-      </fieldset>
-    </form>
+      {!confirmingDelete ? <button type="button" disabled={busy} onClick={() => { setFeedback(null); setConfirmingDelete(true) }}>Slet min bruger</button> :
+        <form className={styles.confirm} aria-label="Bekræft permanent sletning" onSubmit={event => submit(event, 'delete')}>
+          <fieldset disabled={busy} className={styles.form}>
+            <label>Din nuværende adgangskode<input type="password" name="currentPassword" autoComplete="current-password" required /></label>
+            <label className={styles.check}><input type="checkbox" name="confirmDelete" required />Ved at tjekke denne boks af, accepterer du, at vi sletter din bruger og al data vil gå tabt. Dette kan ikke fortrydes!</label>
+            <button type="submit">Slet min bruger permanent</button>
+            <button type="button" className={styles.secondary} onClick={() => setConfirmingDelete(false)}>Annuller</button>
+          </fieldset>
+        </form>}
+    </section>
+    {busy && <p role="status">Behandler din anmodning…</p>}
   </div>
 }
