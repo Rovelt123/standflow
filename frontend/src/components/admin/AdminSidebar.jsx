@@ -18,6 +18,7 @@ const navItems = [
   { label: 'Økonomi', icon: 'economy' },
   { label: 'Indstillinger', icon: 'settings' },
   { label: 'Beskeder', icon: 'economy', to: '/kontrolpanel/beskeder' },
+  { label: 'Nyhedsbrev', icon: 'economy', to: '/kontrolpanel/nyhedsbrev' },
 ]
 
 function AdminSidebar() {

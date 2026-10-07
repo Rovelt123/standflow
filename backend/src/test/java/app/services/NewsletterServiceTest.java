@@ -162,7 +162,7 @@ class NewsletterServiceTest extends NewsletterTestSupport {
         assertTrue(reloadUser(alice.getId()).isAcceptMarketing());
 
         String revoked = tokenService.issueToken(alice);
-        revoke(tokensFor(alice).getLast());
+        tokensFor(alice).forEach(this::revoke);
         error(400, () -> newsletterService.unsubscribe(Map.of("token", revoked)));
         assertTrue(reloadUser(alice.getId()).isAcceptMarketing());
 

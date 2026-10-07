@@ -1,0 +1,104 @@
+.main {
+  padding: 28px;
+  background: #faf8f0;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 640px;
+  padding: 28px;
+  background: #efecdd;
+  border-radius: 8px;
+}
+
+.panel h1 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 500;
+}
+
+.intro {
+  margin: 0;
+  max-width: 54ch;
+  line-height: 1.5;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.field select,
+.field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #d9d9d9;
+  color: inherit;
+  font: inherit;
+  font-weight: 400;
+}
+
+.field textarea {
+  resize: vertical;
+  min-height: 92px;
+}
+
+.hint {
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+.send {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 12px 28px;
+  border: none;
+  border-radius: 999px;
+  background: #2f5d3a;
+  color: #fff;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.send:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.error {
+  margin: 0;
+  color: #9a1b1b;
+  font-weight: 500;
+}
+
+.result {
+  padding: 18px 20px;
+  background: #e3ecd9;
+  border-radius: 8px;
+}
+
+.result h2 {
+  margin: 0 0 10px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.result ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
