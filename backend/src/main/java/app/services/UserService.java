@@ -120,6 +120,28 @@ public class UserService {
 
     //--------------------------------------------------------------
 
+    public boolean getMarketingConsent(UUID id) {
+        return ErrorHandler.tryEntity(userDAO.getById(id), "Brugeren findes ikke.").isAcceptMarketing();
+    }
+
+    //--------------------------------------------------------------
+
+    public User updateMarketingConsent(UUID id, Map<String, ?> body) {
+        User user = ErrorHandler.tryEntity(userDAO.getById(id), "Brugeren findes ikke.");
+        user.setAcceptMarketing(requiredBoolean(body, "marketingConsent"));
+        return userDAO.update(user);
+    }
+
+    //--------------------------------------------------------------
+
+    public User unsubscribeMarketing(UUID id) {
+        User user = ErrorHandler.tryEntity(userDAO.getById(id), "Brugeren findes ikke.");
+        user.setAcceptMarketing(false);
+        return userDAO.update(user);
+    }
+
+    //--------------------------------------------------------------
+
     public User updateProfile(UUID id, Map<String, ?> body) {
         User user = confirmPassword(id, body);
         String email = email(body);
@@ -197,6 +219,18 @@ public class UserService {
             throw new ApiException(400, "Adgangskoden må højst fylde 72 UTF-8 bytes.");
         }
         return password;
+    }
+
+    //--------------------------------------------------------------
+
+    private boolean requiredBoolean(Map<String, ?> body, String field) {
+        if (body == null || !body.containsKey(field)) {
+            throw new ApiException(400, field + " skal angives.");
+        }
+        if (!(body.get(field) instanceof Boolean value)) {
+            throw new ApiException(400, field + " skal være true eller false.");
+        }
+        return value;
     }
 
     //--------------------------------------------------------------

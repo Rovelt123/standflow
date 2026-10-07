@@ -293,6 +293,97 @@ class UserControllerTest {
 
     //--------------------------------------------------------------
 
+    @Test
+    void authenticatedUserCanReadAndChangeMarketingConsent() throws Exception {
+        Map<String, Object> registration = registration();
+        registration.put("acceptMarketing", true);
+        HttpResponse<String> registered = post("/users/auth/register", registration, null);
+        String token = JSON.readTree(registered.body()).path("data").path("token").asText();
+
+        HttpResponse<String> current = request("GET", "/users/me/consent", null, token);
+        assertEquals(200, current.statusCode(), current.body());
+        assertTrue(JSON.readTree(current.body()).path("marketingConsent").asBoolean());
+
+        HttpResponse<String> withdrawn = request("PATCH", "/users/me/consent",
+                Map.of("marketingConsent", false), token);
+        assertEquals(200, withdrawn.statusCode(), withdrawn.body());
+        assertFalse(JSON.readTree(withdrawn.body()).path("marketingConsent").asBoolean());
+
+        try (var reader = emf.createEntityManager()) {
+            User saved = new UserDAO(reader).getByEmail((String) registration.get("email"));
+            assertFalse(saved.isAcceptMarketing());
+            assertTrue(saved.isEmailNotifications());
+        }
+
+        HttpResponse<String> enabled = request("PATCH", "/users/me/consent",
+                Map.of("marketingConsent", true), token);
+        assertEquals(200, enabled.statusCode(), enabled.body());
+        assertTrue(JSON.readTree(enabled.body()).path("marketingConsent").asBoolean());
+
+        try (var reader = emf.createEntityManager()) {
+            User saved = new UserDAO(reader).getByEmail((String) registration.get("email"));
+            assertTrue(saved.isAcceptMarketing());
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void unsubscribeRevokesMarketingConsentAndIsIdempotent() throws Exception {
+        Map<String, Object> registration = registration();
+        registration.put("acceptMarketing", true);
+        HttpResponse<String> registered = post("/users/auth/register", registration, null);
+        String token = JSON.readTree(registered.body()).path("data").path("token").asText();
+
+        for (int i = 0; i < 2; i++) {
+            HttpResponse<String> response = request("POST", "/users/me/unsubscribe", null, token);
+            assertEquals(200, response.statusCode(), response.body());
+            assertFalse(JSON.readTree(response.body()).path("marketingConsent").asBoolean());
+        }
+
+        assertEquals(200, request("GET", "/users/me", null, token).statusCode());
+        try (var reader = emf.createEntityManager()) {
+            User saved = new UserDAO(reader).getByEmail((String) registration.get("email"));
+            assertNotNull(saved);
+            assertFalse(saved.isAcceptMarketing());
+            assertTrue(saved.isEmailNotifications());
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void accountDeletionRequiresAuthenticationAndDeletesOnlyAuthenticatedUser() throws Exception {
+        assertEquals(401, request("DELETE", "/users/me",
+                Map.of("currentPassword", "StrongPassword!", "confirmDelete", true), null).statusCode());
+
+        Map<String, Object> firstRegistration = registration();
+        HttpResponse<String> firstRegistered = post("/users/auth/register", firstRegistration, null);
+        JsonNode firstData = JSON.readTree(firstRegistered.body()).path("data");
+        String firstToken = firstData.path("token").asText();
+        UUID firstUserId = UUID.fromString(firstData.path("data").path("id").asText());
+
+        Map<String, Object> secondRegistration = registration();
+        HttpResponse<String> secondRegistered = post("/users/auth/register", secondRegistration, null);
+        JsonNode secondData = JSON.readTree(secondRegistered.body()).path("data");
+        UUID secondUserId = UUID.fromString(secondData.path("data").path("id").asText());
+
+        UUID firstApplicationId = createAdminTestApplication(firstToken);
+        HttpResponse<String> deleted = request("DELETE", "/users/me", Map.of(
+                "currentPassword", "StrongPassword!",
+                "confirmDelete", true,
+                "id", secondUserId.toString()), firstToken);
+        assertEquals(204, deleted.statusCode(), deleted.body());
+
+        try (var reader = emf.createEntityManager()) {
+            assertNull(reader.find(User.class, firstUserId));
+            assertNotNull(reader.find(User.class, secondUserId));
+            assertNull(reader.find(Application.class, firstApplicationId));
+        }
+    }
+
+    //--------------------------------------------------------------
+
     private static String tokenFor(Role role) throws Exception {
         Map<String, Object> registration = registration();
         assertEquals(201, post("/users/auth/register", registration, null).statusCode());
