@@ -4,6 +4,7 @@ import { clearAuth, getCurrentUser } from '../public/authApi.js'
 import { portalRequest } from './portalApi.js'
 import ProfileSettings from './ProfileSettings.jsx'
 import styles from './PortalPage.module.css'
+import CustomerChat from './CustomerChat.jsx'
 
 const statusLabels = { PENDING: 'Afventer behandling', ACCEPTED: 'Accepteret', REJECTED: 'Afvist', INFO_REQUESTED: 'Oplysninger efterspurgt' }
 const detailFields = { company: 'Virksomhed', contact: 'Kontaktperson', cvr: 'CVR', email: 'E-mail', phone: 'Telefon', address: 'Adresse', city: 'Postnr. og by', website: 'Website', products: 'Produkter', standType: 'Standtype', tables: 'Borde', chairs: 'Stole' }
@@ -85,9 +86,7 @@ export default function PortalPage() {
             </div></div>}
         </article>)}</div>
       </section>}
-      {tab === 'messages' && <section className={styles.card}><p className={styles.eyebrow}>Beskeder til Lise</p><h2>Her kan I snart skrive sammen</h2>
-        <p>Beskedfunktionen er ikke aktiv endnu. Der sendes ingen beskeder herfra.</p>
-        <label className={styles.form}>Besked<textarea disabled placeholder="Beskeder bliver tilgængelige senere" rows={4} /></label><button disabled>Send besked</button></section>}
+      {tab === 'messages' && <CustomerChat user={user}/>}
       {tab === 'settings' && user && <ProfileSettings user={user} onUpdate={setUser} />}
     </>}
   </div></main>

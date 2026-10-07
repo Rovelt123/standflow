@@ -9,6 +9,8 @@ import AccessPage from './pages/public/AccessPage.jsx'
 import { getAuthToken, subscribeAuth } from './pages/public/authApi.js'
 import PublicHeader from './components/layout/PublicHeader.jsx'
 import PortalPage from './pages/portal/PortalPage.jsx'
+import MessagesPage from './pages/kontrolpanel/MessagesPage.jsx'
+import RequireAdmin from './components/admin/RequireAdmin.jsx'
 
 function App() {
   const authenticated = Boolean(useSyncExternalStore(subscribeAuth, getAuthToken, () => null))
@@ -22,10 +24,11 @@ function App() {
         <Route path="/login" element={<AccessPage key="login" />} />
         <Route path="/registrer" element={<AccessPage key="register" register />} />
         <Route path="/ansoegning" element={authenticated ? <ApplicationPage key="new" /> : <Navigate to="/login" replace />} />
-        <Route path="/brugerportal" element={authenticated ? <PortalPage /> : <Navigate to="/login" replace />} />
+        <Route path="/brugerportal" element={ <PortalPage />} />
         <Route path="/brugerportal/ansoegninger/:id/rediger" element={authenticated ? <ApplicationPage key="edit" /> : <Navigate to="/login" replace />} />
-        <Route path="/kontrolpanel" element={<KontrolpanelPage />} />
-      </Routes>
+        <Route path="/kontrolpanel" element={authenticated ? (<RequireAdmin> <KontrolpanelPage /> </RequireAdmin>) : (<Navigate to="/login" replace />)}/>
+        <Route path="/kontrolpanel/beskeder" element={authenticated ? (<RequireAdmin> <MessagesPage /> </RequireAdmin>) : (<Navigate to="/login" replace />)}/>
+     </Routes>
     </BrowserRouter>
   )
 }
