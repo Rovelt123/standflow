@@ -6,6 +6,7 @@ import app.entities.Message;
 import app.entities.User;
 import app.enums.Role;
 import app.services.ConversationService;
+import app.services.MessageEmailService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -27,6 +28,7 @@ public abstract class MessageTestSupport {
     protected EntityManager em;
     protected MessageDAO dao;
     protected ConversationService service;
+    protected RecordingMessageEmailService messageEmailService;
     protected User admin;
     protected User alice;
     protected User bob;
@@ -44,7 +46,9 @@ public abstract class MessageTestSupport {
                 .setProperty("hibernate.show_sql", "false").buildSessionFactory();
         em = emf.createEntityManager();
         dao = new MessageDAO(em);
-        service = new ConversationService(dao, Clock.fixed(Instant.parse("2026-10-06T12:00:00Z"), ZoneOffset.UTC));
+        messageEmailService = new RecordingMessageEmailService();
+        service = new ConversationService(dao, Clock.fixed(Instant.parse("2026-10-06T12:00:00Z"), ZoneOffset.UTC),
+                messageEmailService);
         admin = user("Lise", "Admin", Role.ADMIN);
         alice = user("Alice", "Zebra", Role.USER);
         bob = user("Bob", "Apple", Role.USER);
@@ -91,6 +95,51 @@ public abstract class MessageTestSupport {
     protected long countMessages() {
         try (EntityManager reader = emf.createEntityManager()) {
             return reader.createQuery("select count(m) from Message m", Long.class).getSingleResult();
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    protected static class RecordingMessageEmailService implements MessageEmailService {
+        private int calls;
+        private User lastRecipient;
+        private Message lastMessage;
+        private RuntimeException failure;
+
+        //--------------------------------------------------------------
+
+        @Override
+        public void sendAdminMessageNotification(User recipient, Message message) {
+            calls++;
+            lastRecipient = recipient;
+            lastMessage = message;
+            if (failure != null) {
+                throw failure;
+            }
+        }
+
+        //--------------------------------------------------------------
+
+        public int calls() {
+            return calls;
+        }
+
+        //--------------------------------------------------------------
+
+        public User lastRecipient() {
+            return lastRecipient;
+        }
+
+        //--------------------------------------------------------------
+
+        public Message lastMessage() {
+            return lastMessage;
+        }
+
+        //--------------------------------------------------------------
+
+        public void failWith(RuntimeException failure) {
+            this.failure = failure;
         }
     }
 }

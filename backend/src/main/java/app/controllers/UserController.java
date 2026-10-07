@@ -40,6 +40,9 @@ public class UserController extends BaseController<User, UserDTO> {
             get("users/me", controller::currentUser, Role.USER, Role.ADMIN);
             put("users/me", controller::updateProfile, Role.USER, Role.ADMIN);
             put("users/me/password", controller::changePassword, Role.USER, Role.ADMIN);
+            get("users/me/consent", controller::getMarketingConsent, Role.USER, Role.ADMIN);
+            patch("users/me/consent", controller::updateMarketingConsent, Role.USER, Role.ADMIN);
+            post("users/me/unsubscribe", controller::unsubscribeMarketing, Role.USER, Role.ADMIN);
             delete("users/me", controller::deleteAccount, Role.USER, Role.ADMIN);
         };
     }
@@ -107,6 +110,30 @@ public class UserController extends BaseController<User, UserDTO> {
 
     //--------------------------------------------------------------
 
+    private void getMarketingConsent(Context ctx) {
+        UserDTO current = ctx.attribute("user");
+        consentResponse(ctx, userService.getMarketingConsent(current.getId()));
+    }
+
+    //--------------------------------------------------------------
+
+    private void updateMarketingConsent(Context ctx) {
+        UserDTO current = ctx.attribute("user");
+        User user = userService.updateMarketingConsent(current.getId(),
+                ErrorHandler.tryBody(ctx, Map.class, "Ugyldigt samtykke."));
+        consentResponse(ctx, user.isAcceptMarketing());
+    }
+
+    //--------------------------------------------------------------
+
+    private void unsubscribeMarketing(Context ctx) {
+        UserDTO current = ctx.attribute("user");
+        User user = userService.unsubscribeMarketing(current.getId());
+        consentResponse(ctx, user.isAcceptMarketing());
+    }
+
+    //--------------------------------------------------------------
+
     private void deleteAccount(Context ctx) {
         UserDTO current = ctx.attribute("user");
         userService.deleteAccount(current.getId(), ErrorHandler.tryBody(ctx, Map.class, "Ugyldig bekræftelse."));
@@ -119,5 +146,12 @@ public class UserController extends BaseController<User, UserDTO> {
         UserDTO dto = userMapper.toDTO(user);
         ctx.header("Cache-Control", "no-store");
         ctx.json(Map.of("user", dto, "token", securityService.createToken(dto)));
+    }
+
+    //--------------------------------------------------------------
+
+    private void consentResponse(Context ctx, boolean marketingConsent) {
+        ctx.header("Cache-Control", "no-store");
+        ctx.status(200).json(Map.of("marketingConsent", marketingConsent));
     }
 }
