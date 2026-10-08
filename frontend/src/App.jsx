@@ -13,6 +13,7 @@ import MessagesPage from './pages/kontrolpanel/MessagesPage.jsx'
 import NewsletterPage from './pages/kontrolpanel/NewsletterPage.jsx'
 import UnsubscribePage from './pages/public/UnsubscribePage.jsx'
 import RequireAdmin from './components/admin/RequireAdmin.jsx'
+import MessagesRedirect from './pages/public/MessagesRedirect.jsx'
 
 function App() {
   const authenticated = Boolean(useSyncExternalStore(subscribeAuth, getAuthToken, () => null))
@@ -24,6 +25,7 @@ function App() {
         <Route path="/stadeholdere" element={<ExhibitorsPage />} />
         <Route path="/kontakt" element={<Navigate to={authenticated ? '/brugerportal?tab=messages' : '/login'} replace />} />
         <Route path="/unsubscribe" element={<UnsubscribePage />} />
+        <Route path="/messages" element={authenticated ? <MessagesRedirect /> : <Navigate to="/login" state={{ returnTo: '/messages' }} replace />} />
         <Route path="/login" element={<AccessPage key="login" />} />
         <Route path="/registrer" element={<AccessPage key="register" register />} />
         <Route path="/ansoegning" element={authenticated ? <ApplicationPage key="new" /> : <Navigate to="/login" replace />} />

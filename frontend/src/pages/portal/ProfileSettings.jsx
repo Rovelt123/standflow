@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { deleteAccount, getMarketingConsent, saveProfile, unsubscribeMarketing, updateMarketingConsent } from './portalApi.js'
 import styles from './PortalPage.module.css'
@@ -19,6 +19,7 @@ export default function ProfileSettings({ user, onUpdate }) {
   const [consentFeedback, setConsentFeedback] = useState(null)
   const [consentReload, setConsentReload] = useState(0)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const consentPending = useRef(false)
 
   useEffect(() => {
     let active = true
@@ -33,7 +34,8 @@ export default function ProfileSettings({ user, onUpdate }) {
   //--------------------------------------------------------------
 
   async function changeConsent(nextConsent, unsubscribe = false) {
-    if (busy || consentLoading || marketingConsent === null) return
+    if (busy || consentPending.current || consentLoading || marketingConsent === null) return
+    consentPending.current = true
     setBusy(true)
     setConsentFeedback(null)
     try {
@@ -43,6 +45,7 @@ export default function ProfileSettings({ user, onUpdate }) {
     } catch (error) {
       setConsentFeedback({ error: true, text: error.message })
     } finally {
+      consentPending.current = false
       setBusy(false)
     }
   }
@@ -103,12 +106,12 @@ export default function ProfileSettings({ user, onUpdate }) {
       {consentLoading ? <p role="status">Henter dit samtykke…</p> : marketingConsent !== null &&
         <p>Marketing er {marketingConsent ? 'tilmeldt' : 'afmeldt'}.</p>}
       {consentFeedback && <p role={consentFeedback.error ? 'alert' : 'status'} className={consentFeedback.error ? styles.error : styles.notice}>{consentFeedback.text}</p>}
-      <fieldset className={styles.form} disabled={busy || consentLoading || marketingConsent === null}>
+      {!consentLoading && marketingConsent !== null && <fieldset className={styles.form} disabled={busy}>
         <label className={styles.check}><input type="checkbox" checked={marketingConsent === true}
           onChange={event => changeConsent(event.target.checked)} />Jeg vil modtage marketing og nyhedsbreve</label>
         <button type="button" className={styles.secondary} disabled={marketingConsent !== true}
           onClick={() => changeConsent(false, true)}>Afmeld marketing</button>
-      </fieldset>
+      </fieldset>}
       {consentFeedback?.error && <button type="button" className={styles.secondary} disabled={busy || consentLoading}
         onClick={() => { setConsentLoading(true); setConsentFeedback(null); setConsentReload(current => current + 1) }}>Genindlæs samtykke</button>}
     </section>

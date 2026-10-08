@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import styles from './PublicPages.module.css'
 import { authenticate, getCurrentUser } from './authApi.js'
 
 export default function AccessPage({ register = false }) {
   const navigate = useNavigate()
+  const location = useLocation()
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -33,7 +34,8 @@ export default function AccessPage({ register = false }) {
       const user = await getCurrentUser()
 
       navigate(
-        user.roles?.includes('ADMIN') ? '/kontrolpanel' : '/brugerportal',
+        location.state?.returnTo === '/messages' ? '/messages'
+          : user.roles?.includes('ADMIN') ? '/kontrolpanel' : '/brugerportal',
         { replace: true }
       )
     } catch (failure) {
@@ -69,7 +71,7 @@ export default function AccessPage({ register = false }) {
         <p className={styles.notice}>Adgangskoden skal være 8–30 tegn og indeholde store og små bogstaver samt et specialtegn.</p>
         <label className={styles.checkbox}><input name="acceptTerms" type="checkbox" required />Jeg accepterer betingelserne (påkrævet).</label>
         <label className={styles.checkbox}><input name="acceptPrivacy" type="checkbox" required />Jeg accepterer privatlivspolitikken (påkrævet).</label>
-        <label className={styles.checkbox}><input name="acceptMarketing" type="checkbox" />Jeg ønsker markedsføring og nyhedsbreve (valgfrit).</label>
+        <label className={styles.checkbox}><input name="acceptMarketing" type="checkbox" />Ja tak, jeg vil gerne modtage nyheder og information fra StandFlow.</label>
       </>}
       {!register && <label className={styles.checkbox}><input name="rememberMe" type="checkbox" />Husk mig</label>}
       <button type="submit" disabled={submitting}>{submitting ? 'Vent venligst…' : register ? 'Registrer og fortsæt' : 'Log ind og fortsæt'}</button>
