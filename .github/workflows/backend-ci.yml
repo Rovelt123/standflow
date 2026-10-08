@@ -51,20 +51,38 @@ jobs:
       - name: Deploy backend on port 9595
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         timeout-minutes: 5
+        env:
+          BACKEND_COMPOSE_FILE: /home/jetty/docker-postgres/docker-compose.yml
         run: |
           set -euo pipefail
+          : "${BACKEND_COMPOSE_FILE:?Missing server Compose path}"
+          # Restrict the path before passing it as a remote shell argument.
+          if [[ ! "$BACKEND_COMPOSE_FILE" =~ ^/[a-zA-Z0-9_./-]+$ ]]; then
+            echo "::error::BACKEND_COMPOSE_FILE must be an absolute path without spaces or shell characters."
+            exit 1
+          fi
           SSH_OPTIONS=(-i ~/.ssh/standflow -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3)
           ssh "${SSH_OPTIONS[@]}" -p "$SSH_PORT" "$SSH_USER@$SERVER_IP" \
-            'mkdir -p /home/jetty/Standflow/backend && test -s /home/jetty/Standflow/backend/backend.env && docker compose version'
+            "bash -se -- '$BACKEND_COMPOSE_FILE'" <<'REMOTE'
+          set -euo pipefail
+          test -f "$1" || { echo "Server Compose file does not exist."; exit 1; }
+          cd "$(dirname "$1")"
+          docker compose -f "$1" config --services | grep -Fxq standflow-api
+          mkdir -p /home/jetty/Standflow/backend
+          if [ -d /home/jetty/Standflow/backend/backend.jar ]; then
+            echo "backend.jar is a directory, not a JAR. Remove the empty placeholder directory on the server before deploying."
+            exit 1
+          fi
+          REMOTE
           scp "${SSH_OPTIONS[@]}" -P "$SSH_PORT" backend/target/backend.jar \
             "$SSH_USER@$SERVER_IP:/home/jetty/Standflow/backend/backend.jar.new"
-          scp "${SSH_OPTIONS[@]}" -P "$SSH_PORT" backend/deploy/compose.yaml \
-            "$SSH_USER@$SERVER_IP:/home/jetty/Standflow/backend/compose.yaml"
-          ssh "${SSH_OPTIONS[@]}" -p "$SSH_PORT" "$SSH_USER@$SERVER_IP" 'bash -se' <<'REMOTE'
-          cd /home/jetty/Standflow/backend
-          docker compose -p standflow-backend pull
-          mv backend.jar.new backend.jar
-          docker compose -p standflow-backend up -d --force-recreate
+          ssh "${SSH_OPTIONS[@]}" -p "$SSH_PORT" "$SSH_USER@$SERVER_IP" \
+            "bash -se -- '$BACKEND_COMPOSE_FILE'" <<'REMOTE'
+          set -euo pipefail
+          cd "$(dirname "$1")"
+          docker compose -f "$1" pull standflow-api
+          mv -T /home/jetty/Standflow/backend/backend.jar.new /home/jetty/Standflow/backend/backend.jar
+          docker compose -f "$1" up -d --no-deps --force-recreate standflow-api
           for attempt in $(seq 1 20); do
             if curl --fail --silent --show-error --max-time 5 http://127.0.0.1:9595/api/health; then
               echo "Backend is healthy on port 9595."
@@ -73,6 +91,6 @@ jobs:
             sleep 3
           done
           echo "Backend did not become healthy."
-          docker compose -p standflow-backend ps
+          docker compose -f "$1" ps standflow-api
           exit 1
           REMOTE
