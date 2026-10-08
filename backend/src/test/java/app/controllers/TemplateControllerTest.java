@@ -36,7 +36,7 @@ class TemplateControllerTest extends TemplateTestSupport {
                     TemplateController.registerRoutes(service).addEndpoints()));
         }).beforeMatched(ctx -> {
             // Verify the registered role, without relying on the separate security baseline.
-            if (!ctx.routeRoles().contains(Role.USER)) {
+            if (!ctx.routeRoles().contains(Role.ADMIN)) {
                 throw new ApiException(401, "Authentication required");
             }
         }).exception(ApiException.class, (error, ctx) ->

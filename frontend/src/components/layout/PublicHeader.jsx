@@ -4,9 +4,9 @@ import Icon from '../ui/Icon.jsx'
 import Logo from '../ui/Logo.jsx'
 import styles from './PublicHeader.module.css'
 
-function PublicHeader({ ctaLabel = 'ANSØG OM EN STAND', variant }) {
+function PublicHeader({ authenticated = false }) {
   return (
-    <header className={`${styles.header}${variant === 'application' ? ` ${styles.application}` : ''}`}>
+    <header className={styles.header}>
       <Link to="/" aria-label="Engestofte Gods – forsiden" className={styles.home}><Logo /></Link>
       <nav aria-label="Hovednavigation" className={styles.navigation}>
         <a href="https://www.engestofte.com/da/om-engestofte">Om godset</a>
@@ -15,10 +15,11 @@ function PublicHeader({ ctaLabel = 'ANSØG OM EN STAND', variant }) {
         <NavLink to="/kontakt">Kontakt</NavLink>
       </nav>
       <div className={styles.actions}>
-        {['instagram', 'facebook'].map((name) => (
-          <button key={name} type="button" aria-disabled="true" aria-label={name === 'instagram' ? 'Instagram' : 'Facebook'} className={styles.social}><Icon name={name} /></button>
-        ))}
-        <Button to="/ansoegning" variant="compact">{ctaLabel}</Button>
+        <a href="https://www.instagram.com/engestoftegods/" aria-label="Instagram" className={styles.social} target="_blank" rel="noopener noreferrer"><Icon name="instagram" /></a>
+        <a href="https://www.facebook.com/Engestofte/" aria-label="Facebook" className={styles.social} target="_blank" rel="noopener noreferrer"><Icon name="facebook" /></a>
+        {authenticated
+          ? <NavLink to="/brugerportal" className={styles.profile} aria-label="Min brugerportal" title="Min brugerportal"><i className="fa-solid fa-user" aria-hidden="true"><Icon name="user" /></i></NavLink>
+          : <Button to="/ansoegning" variant="compact">ANSØG OM EN STAND</Button>}
       </div>
     </header>
   )

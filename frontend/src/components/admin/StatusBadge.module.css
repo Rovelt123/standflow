@@ -25,3 +25,9 @@
   color: var(--color-danger);
   background: var(--color-cream);
 }
+
+.info {
+  border-color: var(--color-terracotta);
+  color: var(--color-terracotta);
+  background: var(--color-cream);
+}

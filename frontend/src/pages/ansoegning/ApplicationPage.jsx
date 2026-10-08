@@ -1,7 +1,9 @@
-import { useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import PublicHeader from '../../components/layout/PublicHeader.jsx'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { submitApplication } from './applicationApi.js'
+import { getCurrentUser } from '../public/authApi.js'
+import { prefillApplication } from './applicationDefaults.js'
+import { portalRequest } from '../portal/portalApi.js'
 import styles from './ApplicationPage.module.css'
 
 const companyFields = [
@@ -33,6 +35,7 @@ const furnishings = [
 
 function ApplicationPage() {
   const navigate = useNavigate()
+  const { id } = useParams()
   const [values, setValues] = useState(() => ({
     ...Object.fromEntries(companyFields.map(({ id }) => [id, ''])),
     products: '', previousExhibitor: false, standType: '', tables: 0, chairs: 0,
@@ -42,10 +45,35 @@ function ApplicationPage() {
   const [receipt, setReceipt] = useState(null)
   const submitting = useRef(false)
   const messageRef = useRef(null)
+  const editedFields = useRef(new Set())
+  const [profileError, setProfileError] = useState('')
+  const [loadingApplication, setLoadingApplication] = useState(Boolean(id))
+  const [editAllowed, setEditAllowed] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    if (id) {
+      portalRequest(`/applications/mine/${id}`).then(application => {
+        if (!active) return
+        if (application.status !== 'INFO_REQUESTED') throw new Error('Denne ansøgning kan ikke redigeres lige nu.')
+        setValues(current => Object.fromEntries(Object.keys(current).map(key => [key, application[key] ?? current[key]])))
+        setEditAllowed(true)
+      }).catch(failure => { if (active) setError(failure.message) })
+        .finally(() => { if (active) setLoadingApplication(false) })
+      return () => { active = false }
+    }
+    getCurrentUser().then(user => {
+      if (active) setValues(current => prefillApplication(current, user, editedFields.current))
+    }).catch(() => {
+      if (active) setProfileError('Dine brugeroplysninger kunne ikke hentes. Du kan stadig udfylde felterne selv.')
+    })
+    return () => { active = false }
+  }, [id])
 
   //--------------------------------------------------------------
 
   function changeValue(name, value) {
+    editedFields.current.add(name)
     setValues(current => ({ ...current, [name]: value }))
   }
 
@@ -59,7 +87,7 @@ function ApplicationPage() {
 
   async function handleSubmit(event) {
     event.preventDefault()
-    if (submitting.current) return
+    if (submitting.current || (id && !editAllowed)) return
     submitting.current = true
     setSending(true)
     setError('')
@@ -69,7 +97,7 @@ function ApplicationPage() {
     application.tables = Number(application.tables)
     application.chairs = Number(application.chairs)
     try {
-      setReceipt(await submitApplication(application))
+      setReceipt(id ? await portalRequest(`/applications/mine/${id}`, 'PUT', application) : await submitApplication(application))
     } catch (failure) {
       setError(failure.message)
     } finally {
@@ -83,24 +111,27 @@ function ApplicationPage() {
 
   return (
     <>
-      <PublicHeader activeItem="Stadeholdere" variant="application" />
+      
       <main className={styles.page}>
         <div className={styles.container}>
           {receipt ? (
             <section className={styles.receipt} role="status" tabIndex={-1} ref={messageRef}>
-              <h1>Din ansøgning er modtaget</h1>
+              <h1>{id ? 'Din ansøgning er opdateret' : 'Din ansøgning er modtaget'}</h1>
               <p>Ansøgningen afventer behandling. Din stand er endnu ikke booket.</p>
               <p>Ansøgningsnummer: <strong>{receipt.id}</strong></p>
               <p>Modtaget: <time dateTime={receipt.createdAt}>{receipt.createdAt.split('-').reverse().join('.')}</time></p>
-              <Link to="/">Tilbage til forsiden</Link>
+              <Link to="/brugerportal">Tilbage til min brugerportal</Link>
             </section>
           ) : (
             <form onSubmit={handleSubmit} aria-labelledby="application-title" aria-busy={sending}>
               {error && <p className={styles.error} role="alert" tabIndex={-1} ref={messageRef}>{error}</p>}
-              <fieldset className={styles.columns} disabled={sending}>
+              {profileError && <p role="status">{profileError}</p>}
+              {loadingApplication && <p role="status">Henter din ansøgning…</p>}
+              {id && <Link to="/brugerportal">Tilbage til min brugerportal</Link>}
+              <fieldset className={styles.columns} disabled={sending || loadingApplication || (Boolean(id) && !editAllowed)}>
                 <div className={styles.companyColumn}>
                   <div className={styles.introduction}>
-                    <h1 id="application-title">Stadeholder information</h1>
+                    <h1 id="application-title">{id ? 'Ret din ansøgning' : 'Stadeholder information'}</h1>
                     <p>Udfyld formularen nedenfor med dine virksomhedsoplysninger og stand-ønsker.</p>
                   </div>
                   <section className={styles.company} aria-labelledby="company-title">
@@ -163,8 +194,8 @@ function ApplicationPage() {
                     </div>
                   </section>
                   <div className={styles.actions}>
-                    <button type="button" onClick={() => navigate('/')} className={styles.cancel}>Annuller</button>
-                    <button type="submit" className={styles.send}>{sending ? 'Sender ansøgning…' : 'Send ansøgning'}</button>
+                    <button type="button" onClick={() => navigate('/brugerportal')} className={styles.cancel}>Annuller</button>
+                    <button type="submit" className={styles.send}>{sending ? 'Sender ansøgning…' : id ? 'Send ændringer' : 'Send ansøgning'}</button>
                   </div>
                 </div>
               </fieldset>

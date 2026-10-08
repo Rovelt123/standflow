@@ -45,6 +45,23 @@ public class User {
     @Column(nullable = false, length = 150)
     private String city;
 
+    @Column(name = "accept_terms", nullable = false, columnDefinition = "boolean default false")
+    private boolean acceptTerms;
+
+    @Column(name = "accept_privacy", nullable = false, columnDefinition = "boolean default false")
+    private boolean acceptPrivacy;
+
+    @Column(name = "accept_marketing", nullable = false, columnDefinition = "boolean default false")
+    private boolean acceptMarketing;
+
+    @Builder.Default
+    @Column(name = "email_notifications", nullable = false, columnDefinition = "boolean default true")
+    private boolean emailNotifications = true;
+
+    @JsonIgnore
+    @Column(name = "token_version", nullable = false, columnDefinition = "integer default 0")
+    private int tokenVersion;
+
     @JsonIgnore
     @Column(name = "password_hash", nullable = false, length = 60)
     private String password;

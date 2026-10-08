@@ -7,6 +7,7 @@ import app.support.TemplateTestSupport;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -110,6 +111,94 @@ class TemplateServiceTest extends TemplateTestSupport {
         service.create(request(validBody()));
         service.create(request(validBody().put("name", "Nyhedsbrev")));
         assertEquals(2, service.getAll().size());
+    }
+
+    //--------------------------------------------------------------
+    // Nye tests: slet, variabler, render og validering
+    //--------------------------------------------------------------
+
+    @Test
+    void createThenDeleteRemovesTemplate() throws Exception {
+        UUID id = service.create(request(validBody())).getId();
+        assertEquals(1, countTemplates());
+        service.delete(id);
+        assertEquals(0, countTemplates());
+        assertEquals(404, assertThrows(ApiException.class, () -> service.getById(id)).getStatus());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void deletingUnknownTemplateGives404() {
+        assertEquals(404, assertThrows(ApiException.class, () -> service.delete(UUID.randomUUID())).getStatus());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void renderFillsKnownVariables() throws Exception {
+        UUID id = service.create(request(validBody()
+                .put("subject", "Tak <Firstname>")
+                .put("body", "Hej <Firstname> <Lastname> fra <Company>. Skriv til <Email>."))).getId();
+
+        TemplateService.RenderedTemplate rendered = service.render(id, Map.of(
+                "Firstname", "Anna",
+                "Lastname", "Hansen",
+                "Company", "Nordic Craft",
+                "Email", "anna@nordic.dk"
+        ));
+
+        assertEquals("Tak Anna", rendered.subject());
+        assertEquals("Hej Anna Hansen fra Nordic Craft. Skriv til anna@nordic.dk.", rendered.body());
+        assertTrue(rendered.unknownVariables().isEmpty());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void unknownVariableIsLeftIntactAndReported() throws Exception {
+        UUID id = service.create(request(validBody()
+                .put("subject", "Hej <Fornvan>")
+                .put("body", "Velkommen <Firstname>"))).getId();
+
+        TemplateService.RenderedTemplate rendered = service.render(id, Map.of("Firstname", "Anna"));
+
+        assertEquals("Hej <Fornvan>", rendered.subject());
+        assertEquals("Velkommen Anna", rendered.body());
+        assertEquals(List.of("<Fornvan>"), rendered.unknownVariables());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void unknownVariablesDetectsTypoInDraftWithoutSaving() {
+        assertTrue(service.unknownVariables("Hej <Firstname> og <Company>").isEmpty());
+        assertEquals(List.of("<Fornvan>"), service.unknownVariables("Hej <Fornvan>"));
+        assertEquals(0, countTemplates());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void renderDoesNotChangeStoredTemplate() throws Exception {
+        UUID id = service.create(request(validBody().put("body", "Hej <Firstname>"))).getId();
+
+        service.render(id, Map.of("Firstname", "Anna"));
+
+        assertEquals("Hej <Firstname>", reload(id).getBody());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void missingValueForKnownVariableBecomesEmpty() throws Exception {
+        UUID id = service.create(request(validBody()
+                .put("body", "Hej <Firstname> <Lastname>"))).getId();
+
+        TemplateService.RenderedTemplate rendered = service.render(id, Map.of("Firstname", "Anna"));
+
+        assertEquals("Hej Anna ", rendered.body());
+        assertTrue(rendered.unknownVariables().isEmpty());
     }
 
     //--------------------------------------------------------------

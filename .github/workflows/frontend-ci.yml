@@ -1,0 +1,80 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths: ['frontend/**', '.github/workflows/frontend-ci.yml']
+  pull_request:
+    branches: [main]
+    paths: ['frontend/**', '.github/workflows/frontend-ci.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SERVER_IP: ${{ secrets.SERVER_IP }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Lint and test
+        working-directory: frontend
+        run: |
+          npm run lint
+          npm run lint:eslint
+          node --test tests/*.test.js
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || 'https://standflow.api.roneu.dk/api' }}
+        run: npm run build
+      - name: Configure SSH
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY" && test -n "$SSH_KNOWN_HOSTS"
+          test -n "$SERVER_IP" && test -n "$SSH_USER"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/standflow
+          chmod 600 ~/.ssh/standflow
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Deploy frontend
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          SSH_OPTIONS=(-i ~/.ssh/standflow -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3)
+          ssh "${SSH_OPTIONS[@]}" -p "$SSH_PORT" "$SSH_USER@$SERVER_IP" \
+            'mkdir -p /home/jetty/Standflow/frontend'
+          # Copy assets first. Keep old hashed assets for already-open browser sessions.
+          tar -czf frontend-assets.tar.gz -C frontend/dist --exclude=./index.html .
+          scp "${SSH_OPTIONS[@]}" -P "$SSH_PORT" frontend-assets.tar.gz \
+            "$SSH_USER@$SERVER_IP:/home/jetty/Standflow/frontend-assets.tar.gz"
+          scp "${SSH_OPTIONS[@]}" -P "$SSH_PORT" frontend/dist/index.html \
+            "$SSH_USER@$SERVER_IP:/home/jetty/Standflow/frontend/index.html.new"
+          ssh "${SSH_OPTIONS[@]}" -p "$SSH_PORT" "$SSH_USER@$SERVER_IP" 'bash -se' <<'REMOTE'
+          cd /home/jetty/Standflow
+          tar -xzf frontend-assets.tar.gz -C frontend
+          mv frontend/index.html.new frontend/index.html
+          rm frontend-assets.tar.gz
+          REMOTE
