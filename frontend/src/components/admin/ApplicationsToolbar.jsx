@@ -1,6 +1,24 @@
 import styles from './ApplicationsToolbar.module.css'
 
-function ApplicationsToolbar() {
+const STAND_TYPES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+
+const SORT_OPTIONS = [
+  { value: 'date-desc', label: 'Nyeste først' },
+  { value: 'date-asc', label: 'Ældste først' },
+  { value: 'company-asc', label: 'Virksomhed A–Å' },
+]
+
+function ApplicationsToolbar({
+  query,
+  onQueryChange,
+  standType,
+  onStandTypeChange,
+  sortBy,
+  onSortChange,
+  onExportCsv,
+  resultCount,
+  canExport,
+}) {
   return (
     <div className={styles.toolbar}>
       <div className={styles.filters}>
@@ -14,19 +32,41 @@ function ApplicationsToolbar() {
             className={styles.searchInput}
             placeholder="Søg i ansøgninger..."
             aria-label="Søg i ansøgninger"
-            readOnly
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
           />
         </label>
         <span className={styles.separator} />
-        <button type="button" aria-disabled="true" className={styles.selectWrapper}>
-          <span className={styles.selectLabel}>Standtype: Alle</span>
-          <svg className={styles.chevron} viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </button>
+        <select
+          className={styles.select}
+          value={standType}
+          onChange={(event) => onStandTypeChange(event.target.value)}
+          aria-label="Filtrér efter standtype"
+        >
+          <option value="ALL">Standtype: Alle</option>
+          {STAND_TYPES.map((type) => (
+            <option key={type} value={type}>Standtype: {type}</option>
+          ))}
+        </select>
+        <span className={styles.separator} />
+        <select
+          className={styles.select}
+          value={sortBy}
+          onChange={(event) => onSortChange(event.target.value)}
+          aria-label="Sortér ansøgninger"
+        >
+          {SORT_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
       </div>
-      <button type="button" aria-disabled="true" className={styles.exportButton}>
-        Eksportér CSV
+      <button
+        type="button"
+        className={styles.exportButton}
+        onClick={onExportCsv}
+        disabled={!canExport}
+      >
+        Eksportér CSV{typeof resultCount === 'number' ? ` (${resultCount})` : ''}
       </button>
     </div>
   )

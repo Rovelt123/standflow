@@ -35,7 +35,7 @@ function CommentCell({ application, onSave, busy }) {
   )
 }
 
-function ApplicationsTable({ applications, onStatusChange, onCommentSave, busyId }) {
+function ApplicationsTable({ applications, onStatusChange, onCommentSave, onSelect, busyId }) {
   return (
     <div className={styles.card}>
       <table className={styles.table}>
@@ -54,7 +54,16 @@ function ApplicationsTable({ applications, onStatusChange, onCommentSave, busyId
             const busy = busyId === application.id
             return (
               <tr key={application.id}>
-                <td>{application.company}</td>
+                <td>
+                  <button
+                    type="button"
+                    className={styles.companyButton}
+                    onClick={() => onSelect(application)}
+                    aria-label={`Se detaljer for ${application.company}`}
+                  >
+                    {application.company}
+                  </button>
+                </td>
                 <td className={styles.muted}>{application.contact}</td>
                 <td>{application.standType ? `Type ${application.standType}` : '—'}</td>
                 <td>

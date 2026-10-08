@@ -115,3 +115,29 @@
   outline: 2px solid var(--color-burgundy);
   outline-offset: 2px;
 }
+
+.select {
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--color-wine);
+  font-family: inherit;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 8px 0 0;
+}
+
+.select:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+.exportButton {
+  cursor: pointer;
+}
+
+.exportButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

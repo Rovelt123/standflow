@@ -11,9 +11,9 @@ const iconPaths = {
 }
 
 const navItems = [
-  { label: 'Oversigt', icon: 'overview' },
-  { label: 'Ansøgninger', icon: 'applications' },
-  { label: 'Stadeholdere', icon: 'standholders' },
+  { label: 'Oversigt', icon: 'overview', to: '/kontrolpanel' },
+  { label: 'Ansøgninger', icon: 'applications', to: '/kontrolpanel' },
+  { label: 'Stadeholdere', icon: 'standholders', to: '/kontrolpanel/stadeholdere' },
   { label: 'Plantegning', icon: 'sitePlan' },
   { label: 'Økonomi', icon: 'economy' },
   { label: 'Indstillinger', icon: 'settings' },
@@ -28,7 +28,7 @@ function AdminSidebar() {
         {navItems.map((item) => (
           <li key={item.label}>
             {item.to ? (
-              <NavLink to={item.to} className={styles.item}>
+              <NavLink to={item.to} end className={styles.item}>
                 <svg className={styles.icon} viewBox="0 0 24 24" aria-hidden="true">
                   <path d={iconPaths[item.icon]} />
                 </svg>
