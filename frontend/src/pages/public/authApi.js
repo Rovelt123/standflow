@@ -1,5 +1,5 @@
 const apiBaseUrl = (import.meta.env?.VITE_API_BASE_URL
-  || (import.meta.env?.DEV ? 'http://localhost:9595/api' : '/api')).replace(/\/+$/, '')
+  || (import.meta.env?.DEV ? 'http://standflow.api.roneu.dk:9595' : '/api')).replace(/\/+$/, '')
 const tokenKey = 'standflow.auth.token'
 
 //--------------------------------------------------------------
