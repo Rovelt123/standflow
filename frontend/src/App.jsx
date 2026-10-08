@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import LandingPage from './pages/landing/LandingPage.jsx'
 import ApplicationPage from './pages/ansoegning/ApplicationPage.jsx'
 import KontrolpanelPage from './pages/kontrolpanel/KontrolpanelPage.jsx'
+import StadeholderePage from './pages/kontrolpanel/StadeholderePage.jsx'
 import ExhibitorsPage from './pages/public/ExhibitorsPage.jsx'
 import ContactPage from './pages/public/ContactPage.jsx'
 import AccessPage from './pages/public/AccessPage.jsx'
@@ -30,6 +31,7 @@ function App() {
         <Route path="/brugerportal" element={ <PortalPage />} />
         <Route path="/brugerportal/ansoegninger/:id/rediger" element={authenticated ? <ApplicationPage key="edit" /> : <Navigate to="/login" replace />} />
         <Route path="/kontrolpanel" element={authenticated ? (<RequireAdmin> <KontrolpanelPage /> </RequireAdmin>) : (<Navigate to="/login" replace />)}/>
+        <Route path="/kontrolpanel/stadeholdere" element={authenticated ? (<RequireAdmin> <StadeholderePage /> </RequireAdmin>) : (<Navigate to="/login" replace />)}/>
         <Route path="/kontrolpanel/beskeder" element={authenticated ? (<RequireAdmin> <MessagesPage /> </RequireAdmin>) : (<Navigate to="/login" replace />)}/>
         <Route path="/kontrolpanel/nyhedsbrev" element={authenticated ? (<RequireAdmin> <NewsletterPage /> </RequireAdmin>) : (<Navigate to="/login" replace />)}/>
      </Routes>
