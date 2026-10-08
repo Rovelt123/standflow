@@ -5,7 +5,6 @@ import ApplicationPage from './pages/ansoegning/ApplicationPage.jsx'
 import KontrolpanelPage from './pages/kontrolpanel/KontrolpanelPage.jsx'
 import StadeholderePage from './pages/kontrolpanel/StadeholderePage.jsx'
 import ExhibitorsPage from './pages/public/ExhibitorsPage.jsx'
-import ContactPage from './pages/public/ContactPage.jsx'
 import AccessPage from './pages/public/AccessPage.jsx'
 import { getAuthToken, subscribeAuth } from './pages/public/authApi.js'
 import PublicHeader from './components/layout/PublicHeader.jsx'
@@ -23,7 +22,7 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/stadeholdere" element={<ExhibitorsPage />} />
-        <Route path="/kontakt" element={<ContactPage />} />
+        <Route path="/kontakt" element={<Navigate to={authenticated ? '/brugerportal?tab=messages' : '/login'} replace />} />
         <Route path="/unsubscribe" element={<UnsubscribePage />} />
         <Route path="/login" element={<AccessPage key="login" />} />
         <Route path="/registrer" element={<AccessPage key="register" register />} />
