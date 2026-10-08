@@ -72,7 +72,8 @@ export default function PortalPage() {
         <div className={styles.list}>{applications.map(application => <article className={styles.card} key={application.id}>
           <div className={styles.heading}><div><h3>{application.company}</h3><p>Indsendt {application.createdAt?.split('-').reverse().join('.')} · Stand {application.standType}</p></div>
             <span className={`${styles.status} ${styles[application.status] || ''}`}>{statusLabels[application.status] || application.status}</span></div>
-          {application.status === 'INFO_REQUESTED' && <p className={styles.notice}>Lise har efterspurgt ændringer. Ret oplysningerne og send ansøgningen til behandling igen.</p>}
+          {application.status === 'INFO_REQUESTED' && (<div className={styles.notice}><p> Lise har efterspurgt ændringer. Ret oplysningerne og send ansøgningen til behandling igen.</p>
+              {application.customerNote?.trim() && (<p className={styles.customerNote}>Note: {application.customerNote}</p>)}</div>)}
           <details><summary>Se ansøgning</summary><dl className={styles.details}>{Object.entries(detailFields).map(([field, label]) =>
             <div key={field}><dt>{label}</dt><dd>{application[field] ?? 'Ikke angivet'}</dd></div>)}<div><dt>Tidligere stadeholder</dt><dd>{application.previousExhibitor ? 'Ja' : 'Nej'}</dd></div></dl></details>
           <div className={styles.actions}>

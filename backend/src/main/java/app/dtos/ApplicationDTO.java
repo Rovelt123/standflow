@@ -1,6 +1,7 @@
 package app.dtos;
 
 import lombok.*;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.UUID;
 
@@ -27,4 +28,7 @@ public class ApplicationDTO {
     private Integer chairs;
     private String status;
     private String createdAt;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String customerNote;
 }

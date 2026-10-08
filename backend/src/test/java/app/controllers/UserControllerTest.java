@@ -384,6 +384,40 @@ class UserControllerTest {
 
     //--------------------------------------------------------------
 
+    @Test
+    void adminCanSaveCustomerNoteAndOnlyOwningCustomerCanReadIt() throws Exception {
+        String admin = tokenFor(Role.ADMIN);
+        String customer = tokenFor(Role.USER);
+        String other = tokenFor(Role.USER);
+        UUID id = createAdminTestApplication(customer);
+        String path = "/applications/" + id + "/comment";
+        Map<String, String> notes = Map.of("comment", "Private admin note", "customerNote", "Oplys venligst dit CVR");
+        assertEquals(401, request("PUT", path, notes, customer).statusCode());
+        assertEquals(401, request("PUT", path, notes, null).statusCode());
+        var saved = request("PUT", path, notes, admin);
+        assertEquals(200, saved.statusCode(), saved.body());
+        assertEquals("Oplys venligst dit CVR", JSON.readTree(saved.body()).path("customerNote").asText());
+        assertEquals("Private admin note", JSON.readTree(saved.body()).path("comment").asText());
+        var own = request("GET", "/applications/mine/" + id, null, customer);
+        assertEquals(200, own.statusCode(), own.body());
+        JsonNode ownBody = JSON.readTree(own.body());
+        assertEquals("Oplys venligst dit CVR", ownBody.path("customerNote").asText());
+        assertFalse(ownBody.has("comment"));
+        assertFalse(ownBody.has("internalComment"));
+        assertFalse(own.body().contains("Private admin note"));
+        JsonNode list = JSON.readTree(request("GET", "/applications/mine", null, customer).body());
+        assertTrue(list.isArray());
+        assertEquals("Oplys venligst dit CVR", list.get(0).path("customerNote").asText());
+        assertEquals(404, request("GET", "/applications/mine/" + id, null, other).statusCode());
+        assertEquals(400, request("PUT", path, Map.of("comment", "Changed", "customerNote", 123), admin).statusCode());
+        assertEquals(400, request("PUT", path, Map.of("comment", "Changed", "customerNote", "x".repeat(5001)), admin).statusCode());
+        var legacy = request("PUT", path, Map.of("comment", "Legacy update"), admin);
+        assertEquals(200, legacy.statusCode());
+        assertEquals("Oplys venligst dit CVR", JSON.readTree(legacy.body()).path("customerNote").asText());
+    }
+
+    //--------------------------------------------------------------
+
     private static String tokenFor(Role role) throws Exception {
         Map<String, Object> registration = registration();
         assertEquals(201, post("/users/auth/register", registration, null).statusCode());

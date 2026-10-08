@@ -52,6 +52,7 @@ public class ApplicationMapper implements IMapper<Application, ApplicationDTO> {
                 .chairs(entity.getChairs())
                 .status(entity.getStatus().name())
                 .createdAt(entity.getCreatedAt().toString())
+                .customerNote(entity.getCustomerNote())
                 .build();
     }
 }
