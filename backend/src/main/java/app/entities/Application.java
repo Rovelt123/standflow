@@ -81,6 +81,9 @@ public class Application {
     @Column(name = "internal_comment", length = 5000)
     private String internalComment;
 
+    @Column(name = "customer_note", length = 5000)
+    private String customerNote;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDate createdAt;
 }

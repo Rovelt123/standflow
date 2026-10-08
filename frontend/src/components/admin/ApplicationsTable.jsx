@@ -15,25 +15,46 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('da-DK')
 }
 
+//--------------------------------------------------------------
+
 function CommentCell({ application, onSave, busy }) {
   const [comment, setComment] = useState(application.comment ?? '')
-  const dirty = comment !== (application.comment ?? '')
+  const [customerNote, setCustomerNote] = useState(application.customerNote ?? '')
+  const dirty = comment !== (application.comment ?? '') || customerNote !== (application.customerNote ?? '')
   return (
     <div className={styles.comment}>
-      <input
+      <label className={styles.commentLabel}>
+        Intern kommentar
+        <input
         className={styles.commentInput}
         value={comment}
         placeholder="Intern note (fx mangler CVR)"
         aria-label={`Intern kommentar for ${application.company}`}
         onChange={event => setComment(event.target.value)}
         disabled={busy}
-      />
-      <button type="button" className={styles.saveButton} disabled={busy || !dirty} onClick={() => onSave(application.id, comment)}>
+        maxLength={5000}
+        />
+      </label>
+      <label className={styles.commentLabel}>
+        Note til kunden
+        <input
+          className={styles.commentInput}
+          value={customerNote}
+          placeholder="Fx oplys venligst dit CVR-nummer"
+          aria-label={`Note til kunden for ${application.company}`}
+          onChange={event => setCustomerNote(event.target.value)}
+          disabled={busy}
+          maxLength={5000}
+        />
+      </label>
+      <button type="button" className={styles.saveButton} disabled={busy || !dirty} onClick={() => onSave(application.id, comment, customerNote)}>
         Gem
       </button>
     </div>
   )
 }
+
+//--------------------------------------------------------------
 
 function ApplicationsTable({ applications, onStatusChange, onCommentSave, onSelect, busyId }) {
   return (
@@ -46,7 +67,7 @@ function ApplicationsTable({ applications, onStatusChange, onCommentSave, onSele
             <th>Standtype</th>
             <th>Status</th>
             <th className={styles.dateHeader}>Dato</th>
-            <th>Intern kommentar</th>
+            <th>Kommentarer</th>
           </tr>
         </thead>
         <tbody>

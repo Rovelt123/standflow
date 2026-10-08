@@ -15,6 +15,32 @@ import static org.junit.jupiter.api.Assertions.*;
 class ApplicationHandlingServiceTest extends ApplicationTestSupport {
 
     @Test
+    void pdfFailureLeavesExactlyOneSavedApplicationAndDoesNotSend() throws Exception {
+        pdfGenerator.failWith(new ApiException(500, "PDF generation failed"));
+        var input = request(validBody());
+        assertThrows(ApiException.class, () -> service.create(input));
+        assertEquals(1, countApplications());
+        assertEquals(1, pdfGenerator.calls());
+        assertEquals(0, emailService.calls());
+        assertEquals(ApplicationStatus.PENDING, service.getAll().getFirst().getStatus());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void deliveryFailureLeavesExactlyOneSavedApplicationWithoutRetrying() throws Exception {
+        emailService.failWith(new ApiException(500, "SMTP delivery failed"));
+        var input = request(validBody());
+        assertThrows(ApiException.class, () -> service.create(input));
+        assertEquals(1, countApplications());
+        assertEquals(1, pdfGenerator.calls());
+        assertEquals(1, emailService.calls());
+        assertEquals(ApplicationStatus.PENDING, service.getAll().getFirst().getStatus());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
     void statusAndCommentsPersistIndependentlyWithoutSendingMail() throws Exception {
         assertTrue(service.getAll().isEmpty());
         Application application = service.create(request(validBody()));

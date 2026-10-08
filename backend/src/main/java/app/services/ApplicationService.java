@@ -154,6 +154,7 @@ public class ApplicationService {
             Application updated = mapper.toEntity(normalized);
             updated.setUserId(userId);
             updated.setInternalComment(current.getInternalComment());
+            updated.setCustomerNote(current.getCustomerNote());
             return applicationDAO.update(updated);
         }
     }
@@ -195,13 +196,25 @@ public class ApplicationService {
     //--------------------------------------------------------------
 
     public Application updateComment(UUID id, Map<String, ?> body) {
-        String comment = adminField(body, "comment");
+        if (body == null || !Set.of("comment", "customerNote").containsAll(body.keySet())
+                || !(body.get("comment") instanceof String)) {
+            throw new ApiException(400, "Request skal indeholde comment som tekst og eventuelt customerNote.");
+        }
+        String comment = (String) body.get("comment");
         if (comment.length() > 5000) {
             throw new ApiException(400, "Intern kommentar må højst være 5000 tegn.");
+        }
+        String customerNote = null;
+        if (body.containsKey("customerNote")) {
+            if (!(body.get("customerNote") instanceof String note) || note.length() > 5000) {
+                throw new ApiException(400, "Note til kunden skal være tekst på højst 5000 tegn.");
+            }
+            customerNote = (String) body.get("customerNote");
         }
         synchronized (applicationDAO) {
             Application application = getById(id);
             application.setInternalComment(comment);
+            if (body.containsKey("customerNote")) application.setCustomerNote(customerNote);
             return applicationDAO.update(application);
         }
     }

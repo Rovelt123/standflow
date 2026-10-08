@@ -12,7 +12,7 @@ function PublicHeader({ authenticated = false }) {
         <a href="https://www.engestofte.com/da/om-engestofte">Om godset</a>
         <a href="https://www.engestofte.com/da/julemarked">Julemarked</a>
         <NavLink to="/stadeholdere">Stadeholdere</NavLink>
-        <NavLink to="/kontakt">Kontakt</NavLink>
+        <NavLink to={authenticated ? '/brugerportal?tab=messages' : '/login'}>Kontakt</NavLink>
       </nav>
       <div className={styles.actions}>
         <a href="https://www.instagram.com/engestoftegods/" aria-label="Instagram" className={styles.social} target="_blank" rel="noopener noreferrer"><Icon name="instagram" /></a>

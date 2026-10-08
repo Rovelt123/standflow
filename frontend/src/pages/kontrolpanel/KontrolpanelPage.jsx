@@ -7,6 +7,7 @@ import ApplicationsTable from '../../components/admin/ApplicationsTable.jsx'
 import ApplicationDetail from '../../components/admin/ApplicationDetail.jsx'
 import { portalRequest } from '../portal/portalApi.js'
 import styles from './KontrolpanelPage.module.css'
+import { applicationSearchScore } from './applicationSearch.js'
 
 function countBy(applications, status) {
   return applications.filter(application => application.status === status).length
@@ -69,10 +70,7 @@ function KontrolpanelPage() {
     const q = query.trim().toLowerCase()
     const filtered = applications.filter((a) => {
       if (standTypeFilter !== 'ALL' && a.standType !== standTypeFilter) return false
-      if (!q) return true
-      return [a.company, a.contact, a.email, a.cvr, a.city].some(
-        (field) => (field ? String(field).toLowerCase().includes(q) : false),
-      )
+      return applicationSearchScore(a, q) >= 0
     })
     const sorted = [...filtered]
     if (sortBy === 'company-asc') {
@@ -84,6 +82,7 @@ function KontrolpanelPage() {
         return sortBy === 'date-asc' ? da - db : db - da
       })
     }
+    if (q) sorted.sort((a, b) => applicationSearchScore(b, q) - applicationSearchScore(a, q))
     return sorted
   }, [applications, query, standTypeFilter, sortBy])
 
@@ -104,11 +103,11 @@ function KontrolpanelPage() {
     }
   }
 
-  async function onCommentSave(id, comment) {
+  async function onCommentSave(id, comment, customerNote) {
     setBusyId(id)
     setActionError('')
     try {
-      applyUpdated(await portalRequest(`/applications/${id}/comment`, 'PUT', { comment }))
+      applyUpdated(await portalRequest(`/applications/${id}/comment`, 'PUT', { comment, customerNote }))
     } catch (caught) {
       setActionError(caught.message)
     } finally {
