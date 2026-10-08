@@ -67,11 +67,15 @@ class ConversationServiceTest extends MessageTestSupport {
 
         MessageDTO first = service.sendAdmin(admin.getId(), alice.getId(),
                 Map.of("subject", "Welcome", "body", "Hello"));
-        service.sendCustomer(alice.getId(), Map.of("subject", "Customer", "body", "No notification"));
+
 
         assertEquals(1, messageEmailService.calls());
         assertEquals(alice.getId(), messageEmailService.lastRecipient().getId());
         assertEquals(first.getId(), messageEmailService.lastMessage().getId());
+        MessageDTO customerMessage = service.sendCustomer(alice.getId(), Map.of("subject", "Customer", "body", "Hello"));
+        assertEquals(2, messageEmailService.calls());
+        assertEquals(admin.getId(), messageEmailService.lastRecipient().getId());
+        assertEquals(customerMessage.getId(), messageEmailService.lastMessage().getId());
         assertEquals(2, countMessages());
     }
 
@@ -81,10 +85,10 @@ class ConversationServiceTest extends MessageTestSupport {
     void notificationFailureDoesNotCreateDuplicatePersistedMessages() {
         messageEmailService.failWith(new ApiException(500, "Beskednotifikationen kunne ikke sendes via e-mail."));
 
-        ApiException failure = assertThrows(ApiException.class, () -> service.sendAdmin(admin.getId(), alice.getId(),
+        MessageDTO saved = assertDoesNotThrow(() -> service.sendAdmin(admin.getId(), alice.getId(),
                 Map.of("subject", "Welcome", "body", "Hello")));
 
-        assertEquals(500, failure.getStatus());
+        assertNotNull(reload(saved.getId()));
         assertEquals(1, messageEmailService.calls());
         assertEquals(1, countMessages());
         assertEquals(1, service.getThread(admin.getId(), alice.getId()).size());
@@ -200,6 +204,20 @@ class ConversationServiceTest extends MessageTestSupport {
         error(400, () -> service.sendAdmin(admin.getId(), alice.getId(), Map.of("subject", "", "body", "b")));
         error(400, () -> service.sendAdmin(admin.getId(), alice.getId(), Map.of("body", " ")));
         assertEquals(1, countMessages());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void customerNotificationFailureReturnsTheSinglePersistedMessage() {
+        messageEmailService.failWith(new ApiException(500, "SMTP failed"));
+        MessageDTO saved = assertDoesNotThrow(() -> service.sendCustomer(alice.getId(),
+                Map.of("subject", "Question", "body", "Hello")));
+        assertEquals(1, messageEmailService.calls());
+        assertEquals(admin.getId(), messageEmailService.lastRecipient().getId());
+        assertEquals(1, countMessages());
+        assertNotNull(reload(saved.getId()));
+        assertEquals(saved.getId(), service.getMine(alice.getId()).getFirst().getId());
     }
 
     //--------------------------------------------------------------

@@ -4,61 +4,51 @@ import app.entities.Message;
 import app.entities.User;
 import app.exceptions.ApiException;
 import app.utils.Utils;
-import jakarta.mail.Authenticator;
+import app.configs.SmtpConfig;
 import jakarta.mail.MessagingException;
-import jakarta.mail.PasswordAuthentication;
-import jakarta.mail.Session;
 import jakarta.mail.Transport;
-import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Properties;
+import java.util.Objects;
+import java.util.function.Supplier;
 
 public class GmailSmtpMessageEmailService implements MessageEmailService {
 
-    private static final String SMTP_HOST = "smtp.gmail.com";
-    private static final int SMTP_PORT = 587;
-    private static final String USERNAME_ENV = "GMAIL_USERNAME";
-    private static final String PASSWORD_ENV = "GMAIL_APP_PASSWORD";
-    private static final String FRONTEND_URL_PROPERTY = "FRONTEND_URL";
+    private final Supplier<SmtpConfig> configuration;
+    private final SmtpDelivery delivery;
+
+    //--------------------------------------------------------------
+
+    public GmailSmtpMessageEmailService() {
+        this(SmtpConfig::load, Transport::send);
+    }
+
+    //--------------------------------------------------------------
+
+    public GmailSmtpMessageEmailService(Supplier<SmtpConfig> configuration, SmtpDelivery delivery) {
+        this.configuration = Objects.requireNonNull(configuration);
+        this.delivery = Objects.requireNonNull(delivery);
+    }
 
     //--------------------------------------------------------------
 
     @Override
     public void sendAdminMessageNotification(User recipient, Message message) {
         try {
-            String username = requiredEnv(USERNAME_ENV);
-            String password = requiredEnv(PASSWORD_ENV);
+            SmtpConfig config = configuration.get();
 
-            MimeMessage email = new MimeMessage(createSession(username, password));
-            email.setFrom(new InternetAddress(username));
+            MimeMessage email = new MimeMessage(config.session());
+            email.setFrom(SmtpConfig.address(config.required("GMAIL_USERNAME")));
             email.setRecipients(jakarta.mail.Message.RecipientType.TO,
-                    InternetAddress.parse(recipient.getEmail()));
+                    new jakarta.mail.Address[]{SmtpConfig.address(recipient.getEmail())});
             email.setSubject("Ny besked i StandFlow", StandardCharsets.UTF_8.name());
             email.setText(body(), StandardCharsets.UTF_8.name());
 
-            Transport.send(email);
+            delivery.send(email);
         } catch (MessagingException exception) {
             throw new ApiException(500, "Beskednotifikationen kunne ikke sendes via e-mail.");
         }
-    }
-
-    //--------------------------------------------------------------
-
-    private Session createSession(String username, String password) {
-        Properties properties = new Properties();
-        properties.put("mail.smtp.host", SMTP_HOST);
-        properties.put("mail.smtp.port", String.valueOf(SMTP_PORT));
-        properties.put("mail.smtp.auth", "true");
-        properties.put("mail.smtp.starttls.enable", "true");
-
-        return Session.getInstance(properties, new Authenticator() {
-            @Override
-            protected PasswordAuthentication getPasswordAuthentication() {
-                return new PasswordAuthentication(username, password);
-            }
-        });
     }
 
     //--------------------------------------------------------------
@@ -72,17 +62,8 @@ public class GmailSmtpMessageEmailService implements MessageEmailService {
     //--------------------------------------------------------------
 
     private String frontendUrl() {
-        String value = Utils.getPropertyValue(FRONTEND_URL_PROPERTY, "config.properties");
+        String value = Utils.getPropertyValue("FRONTEND_URL", "config.properties");
         return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 
-    //--------------------------------------------------------------
-
-    private String requiredEnv(String name) {
-        String value = System.getenv(name);
-        if (value == null || value.isBlank()) {
-            throw new ApiException(500, "SMTP-konfiguration mangler.");
-        }
-        return value.trim();
-    }
 }
