@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 public class ConversationService {
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(ConversationService.class);
     private final MessageDAO messageDAO;
     private final MessageMapper mapper = new MessageMapper();
     private final Clock clock;
@@ -53,8 +54,10 @@ public class ConversationService {
         User customer = authenticatedCustomer(authenticatedId);
         User admin = chatAdmin();
         validateFields(request, Set.of("subject", "body"));
-        return mapper.toDTO(save(customer, admin, requiredText(request, "subject", 200),
-                requiredText(request, "body", 5000)));
+        Message message = save(customer, admin, requiredText(request, "subject", 200),
+                requiredText(request, "body", 5000));
+        notifyAfterSave(admin, message, true);
+        return mapper.toDTO(message);
     }
 
     //--------------------------------------------------------------
@@ -83,7 +86,7 @@ public class ConversationService {
         String subject = conversation.isEmpty() ? requiredText(request, "subject", 200)
                 : conversation.getLast().getSubject();
         Message message = save(admin, customer, subject, requiredText(request, "body", 5000));
-        messageEmailService.sendAdminMessageNotification(customer, message);
+        notifyAfterSave(customer, message, false);
         return mapper.toDTO(message);
     }
 
@@ -146,6 +149,21 @@ public class ConversationService {
             return messageDAO.create(message);
         } catch (RuntimeException exception) {
             throw new ApiException(500, "Beskeden kunne ikke gemmes.");
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    private void notifyAfterSave(User recipient, Message message, boolean fromCustomer) {
+        try {
+            if (fromCustomer) {
+                messageEmailService.sendCustomerMessageNotification(recipient, message);
+            } else {
+                messageEmailService.sendAdminMessageNotification(recipient, message);
+            }
+        } catch (RuntimeException exception) {
+            // Persistence succeeded: return the saved message so clients do not retry the write.
+            LOGGER.warn("Chat notification failed; saved message retained. Check SMTP configuration or delivery.");
         }
     }
 

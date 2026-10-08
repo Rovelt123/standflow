@@ -49,6 +49,12 @@ public class UnsubscribeTokenService {
 
     public String issueToken(User user) {
         tokenDAO.revokeActiveForUser(user);
+        return prepareToken(user);
+    }
+
+    //--------------------------------------------------------------
+
+    public String prepareToken(User user) {
         String token = createRawToken();
         LocalDateTime now = tokenCreatedAt(user);
         tokenDAO.create(UnsubscribeToken.builder()
@@ -59,6 +65,18 @@ public class UnsubscribeTokenService {
                 .revoked(false)
                 .build());
         return token;
+    }
+
+    //--------------------------------------------------------------
+
+    public void deliverySucceeded(User user, String token) {
+        tokenDAO.revokeOtherTokens(user, hash(token));
+    }
+
+    //--------------------------------------------------------------
+
+    public void deliveryFailed(String token) {
+        tokenDAO.revokeToken(hash(token));
     }
 
     //--------------------------------------------------------------

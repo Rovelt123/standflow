@@ -310,6 +310,21 @@ class MessageControllerTest extends MessageTestSupport {
 
     //--------------------------------------------------------------
 
+    @Test
+    void notificationFailuresStillReturnCreatedForBothDirections() throws Exception {
+        messageEmailService.failWith(new ApiException(500, "SMTP failed"));
+        var customer = send("POST", "/api/messages", "{\"subject\":\"Question\",\"body\":\"Hello\"}", alice);
+        assertEquals(201, customer.statusCode());
+        var adminReply = send("POST", "/api/messages/threads/" + alice.getId(), "{\"body\":\"Reply\"}", admin);
+        assertEquals(201, adminReply.statusCode());
+        assertNotNull(reload(UUID.fromString(json.readTree(customer.body()).get("id").asText())));
+        assertNotNull(reload(UUID.fromString(json.readTree(adminReply.body()).get("id").asText())));
+        assertEquals(2, countMessages());
+        assertEquals(2, messageEmailService.calls());
+    }
+
+    //--------------------------------------------------------------
+
     private void assertConfigurationFailureOverHttp() throws Exception {
         assertEquals(500, send("POST", "/api/messages", "{\"subject\":\"s\",\"body\":\"b\"}", alice).statusCode());
         assertEquals(500, send("GET", "/api/messages/mine", null, alice).statusCode());

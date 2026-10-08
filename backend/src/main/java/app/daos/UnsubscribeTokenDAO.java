@@ -30,6 +30,32 @@ public class UnsubscribeTokenDAO extends EntityManagerDAO<UnsubscribeToken> {
 
     //--------------------------------------------------------------
 
+    public void revokeOtherTokens(User user, String tokenHash) {
+        executeQuery(() -> {
+            em.createQuery("""
+                    update UnsubscribeToken t set t.revoked = true
+                    where t.user.id = :userId and t.tokenHash <> :tokenHash and t.revoked = false
+                    """)
+                    .setParameter("userId", user.getId())
+                    .setParameter("tokenHash", tokenHash)
+                    .executeUpdate();
+            return null;
+        });
+    }
+
+    //--------------------------------------------------------------
+
+    public void revokeToken(String tokenHash) {
+        executeQuery(() -> {
+            em.createQuery("update UnsubscribeToken t set t.revoked = true where t.tokenHash = :tokenHash")
+                    .setParameter("tokenHash", tokenHash)
+                    .executeUpdate();
+            return null;
+        });
+    }
+
+    //--------------------------------------------------------------
+
     public UnsubscribeToken getUsableToken(String tokenHash, LocalDateTime now) {
         return executeQuery(() -> em.createQuery("""
                 select t from UnsubscribeToken t

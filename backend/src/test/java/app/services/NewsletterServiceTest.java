@@ -203,6 +203,79 @@ class NewsletterServiceTest extends NewsletterTestSupport {
     //--------------------------------------------------------------
 
     @Test
+    void failedReplacementPreservesDeliveredLinkAndRevokesUnsentToken() {
+        var request = NewsletterRequest.builder().audience("INDIVIDUAL").templateId(template.getId())
+                .recipientIds(List.of(alice.getId())).build();
+        newsletterService.send(request);
+        String delivered = unsubscribeTokenFrom(emailService.sent().getFirst().body());
+        emailService.failWith(new ApiException(500, "SMTP failed"));
+        assertCounts(newsletterService.send(request), 0, 0, 1);
+        assertEquals(2, tokensFor(alice).size());
+        assertEquals(1, tokensFor(alice).stream().filter(t -> !t.isRevoked()).count());
+        newsletterService.unsubscribe(Map.of("token", delivered));
+        assertFalse(reloadUser(alice.getId()).isAcceptMarketing());
+        assertCounts(newsletterService.send(request), 0, 1, 0);
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void successfulReplacementRevokesOldLinkAndNewLinkUnsubscribes() {
+        var request = NewsletterRequest.builder().audience("INDIVIDUAL").templateId(template.getId())
+                .recipientIds(List.of(alice.getId())).build();
+        newsletterService.send(request);
+        newsletterService.send(request);
+        String oldToken = unsubscribeTokenFrom(emailService.sent().get(0).body());
+        String newToken = unsubscribeTokenFrom(emailService.sent().get(1).body());
+        error(400, () -> newsletterService.unsubscribe(Map.of("token", oldToken)));
+        newsletterService.unsubscribe(Map.of("token", newToken));
+        assertFalse(reloadUser(alice.getId()).isAcceptMarketing());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void failedRecipientDoesNotPreventLaterEligibleDelivery() {
+        var attempted = new java.util.ArrayList<UUID>();
+        var delivered = new java.util.ArrayList<UUID>();
+        NewsletterEmailService selectiveFailure = (recipient, subject, body) -> {
+            attempted.add(recipient.getId());
+            if (recipient.getId().equals(alice.getId())) throw new ApiException(500, "SMTP failed");
+            delivered.add(recipient.getId());
+        };
+        var service = new NewsletterService(applicationDAO, userDAO, new TemplateService(templateDAO),
+                tokenService, selectiveFailure, clock);
+        var request = NewsletterRequest.builder().audience("INDIVIDUAL").templateId(template.getId())
+                .recipientIds(List.of(alice.getId(), bob.getId(), charlie.getId())).build();
+        assertCounts(service.send(request), 1, 1, 1);
+        assertEquals(List.of(alice.getId(), charlie.getId()), attempted);
+        assertEquals(List.of(charlie.getId()), delivered);
+        assertTrue(tokensFor(bob).isEmpty());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void tokenCleanupFailureDoesNotReclassifyDeliveredMailOrRevokeItsLink() {
+        var failingCleanup = new UnsubscribeTokenService(tokenDAO, userDAO, new java.security.SecureRandom(), clock) {
+            @Override
+            public void deliverySucceeded(app.entities.User user, String token) {
+                throw new ApiException(500, "Cleanup unavailable");
+            }
+        };
+        var service = new NewsletterService(applicationDAO, userDAO, new TemplateService(templateDAO),
+                failingCleanup, emailService, clock);
+        var request = NewsletterRequest.builder().audience("INDIVIDUAL").templateId(template.getId())
+                .recipientIds(List.of(alice.getId(), charlie.getId())).build();
+        assertCounts(service.send(request), 2, 0, 0);
+        String delivered = unsubscribeTokenFrom(emailService.sent().getFirst().body());
+        service.unsubscribe(Map.of("token", delivered));
+        assertFalse(reloadUser(alice.getId()).isAcceptMarketing());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
     void rejectsInvalidRequests() {
         error(400, () -> newsletterService.send(null));
         error(400, () -> newsletterService.send(NewsletterRequest.builder().templateId(template.getId()).build()));

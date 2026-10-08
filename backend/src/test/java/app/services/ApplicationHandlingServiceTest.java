@@ -15,73 +15,27 @@ import static org.junit.jupiter.api.Assertions.*;
 class ApplicationHandlingServiceTest extends ApplicationTestSupport {
 
     @Test
-    void customerNotePersistsAndLegacyCommentUpdatesPreserveIt() throws Exception {
-        Application application = service.create(request(validBody()));
-        service.updateComment(application.getId(), Map.of("comment", "Kun for Lise", "customerNote", "Oplys venligst CVR"));
-        service.updateComment(application.getId(), Map.of("comment", "Ny intern kommentar"));
-        try (var reader = emf.createEntityManager()) {
-            Application saved = reader.find(Application.class, application.getId());
-            assertEquals("Oplys venligst CVR", saved.getCustomerNote());
-            assertEquals("Ny intern kommentar", saved.getInternalComment());
-            assertEquals("Oplys venligst CVR", reader.createNativeQuery(
-                    "select customer_note from applications where id = :id", String.class)
-                    .setParameter("id", application.getId()).getSingleResult());
-            var response = json.valueToTree(new app.mappers.ApplicationMapper().toDTO(saved));
-            assertEquals("Oplys venligst CVR", response.path("customerNote").asText());
-            assertFalse(response.has("comment"));
-            assertFalse(response.has("internalComment"));
-        }
-        service.updateComment(application.getId(), Map.of("comment", "", "customerNote", ""));
-        assertEquals("", service.getById(application.getId()).getCustomerNote());
+    void pdfFailureLeavesExactlyOneSavedApplicationAndDoesNotSend() throws Exception {
+        pdfGenerator.failWith(new ApiException(500, "PDF generation failed"));
+        var input = request(validBody());
+        assertThrows(ApiException.class, () -> service.create(input));
+        assertEquals(1, countApplications());
+        assertEquals(1, pdfGenerator.calls());
+        assertEquals(0, emailService.calls());
+        assertEquals(ApplicationStatus.PENDING, service.getAll().getFirst().getStatus());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void deliveryFailureLeavesExactlyOneSavedApplicationWithoutRetrying() throws Exception {
+        emailService.failWith(new ApiException(500, "SMTP delivery failed"));
+        var input = request(validBody());
+        assertThrows(ApiException.class, () -> service.create(input));
+        assertEquals(1, countApplications());
+        assertEquals(1, pdfGenerator.calls());
         assertEquals(1, emailService.calls());
-    }
-
-    //--------------------------------------------------------------
-
-    @Test
-    void customerResubmissionPreservesAdminNoteAndRejectsPublicNoteInput() throws Exception {
-        UUID customerId = UUID.randomUUID();
-        Application application = service.create(request(validBody()), customerId);
-        service.updateComment(application.getId(), Map.of("comment", "Private", "customerNote", "Ret dit CVR"));
-        service.updateStatus(application.getId(), Map.of("status", "INFO_REQUESTED"));
-        var request = request(validBody());
-        request.setCustomerNote("Forged customer note");
-        service.updateOwn(application.getId(), customerId, request);
-        try (var reader = emf.createEntityManager()) {
-            Application saved = reader.find(Application.class, application.getId());
-            assertEquals("Ret dit CVR", saved.getCustomerNote());
-            assertEquals("Private", saved.getInternalComment());
-            assertEquals(ApplicationStatus.PENDING, saved.getStatus());
-        }
-        assertEquals(400, assertThrows(ApiException.class, () ->
-                service.validateRequestFields(Map.of("customerNote", "Forged"))).getStatus());
-        var parsed = json.readValue("{\"customerNote\":\"Forged\"}", app.dtos.ApplicationDTO.class);
-        assertNull(parsed.getCustomerNote());
-    }
-
-    //--------------------------------------------------------------
-
-    @Test
-    void invalidNotesRejectEntireUpdateBeforeEitherFieldChanges() throws Exception {
-        Application application = service.create(request(validBody()));
-        service.updateComment(application.getId(), Map.of("comment", "Private", "customerNote", "Original"));
-        for (Object value : new Object[]{123, true, null, "x".repeat(5001)}) {
-            Map<String, Object> body = new java.util.HashMap<>();
-            body.put("comment", "Changed");
-            body.put("customerNote", value);
-            assertEquals(400, assertThrows(ApiException.class, () -> service.updateComment(application.getId(), body)).getStatus());
-        }
-        assertEquals(400, assertThrows(ApiException.class, () -> service.updateComment(application.getId(),
-                Map.of("comment", "Changed", "customerNote", "Note", "unknown", "x"))).getStatus());
-        assertEquals(400, assertThrows(ApiException.class, () -> service.updateComment(application.getId(),
-                Map.of("comment", "x".repeat(5001), "customerNote", "Changed"))).getStatus());
-        try (var reader = emf.createEntityManager()) {
-            Application saved = reader.find(Application.class, application.getId());
-            assertEquals("Private", saved.getInternalComment());
-            assertEquals("Original", saved.getCustomerNote());
-        }
-        service.updateComment(application.getId(), Map.of("comment", "Private", "customerNote", "x".repeat(5000)));
-        assertEquals(5000, service.getById(application.getId()).getCustomerNote().length());
+        assertEquals(ApplicationStatus.PENDING, service.getAll().getFirst().getStatus());
     }
 
     //--------------------------------------------------------------

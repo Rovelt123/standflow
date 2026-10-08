@@ -24,6 +24,7 @@ import java.util.Set;
 import java.util.UUID;
 
 public class NewsletterService {
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(NewsletterService.class);
 
     private static final Set<String> NO_SELECTOR_AUDIENCES = Set.of(
             NewsletterAudience.NEW_STALLHOLDERS.name(),
@@ -75,21 +76,40 @@ public class NewsletterService {
                 skippedNoConsent++;
                 continue;
             }
-            String unsubscribeLink = unsubscribeLink(unsubscribeTokenService.issueToken(recipient));
+            String token = unsubscribeTokenService.prepareToken(recipient);
+            String unsubscribeLink = unsubscribeLink(token);
             String subject = render(template.getSubject(), recipient);
             String body = appendUnsubscribe(render(template.getBody(), recipient), unsubscribeLink);
             try {
                 emailService.sendNewsletter(recipient, subject, body);
-                sentTo++;
             } catch (RuntimeException exception) {
+                finishTokenDelivery(recipient, token, false);
                 failedToSend++;
+                continue;
             }
+            sentTo++;
+            finishTokenDelivery(recipient, token, true);
         }
         return NewsletterResponse.builder()
                 .sentTo(sentTo)
                 .skippedNoConsent(skippedNoConsent)
                 .failedToSend(failedToSend)
                 .build();
+    }
+
+    //--------------------------------------------------------------
+
+    private void finishTokenDelivery(User recipient, String token, boolean delivered) {
+        try {
+            if (delivered) {
+                unsubscribeTokenService.deliverySucceeded(recipient, token);
+            } else {
+                unsubscribeTokenService.deliveryFailed(token);
+            }
+        } catch (RuntimeException exception) {
+            // Cleanup must not revoke a delivered link or stop other recipients.
+            LOGGER.warn("Newsletter token cleanup failed; existing token expiry remains in effect.");
+        }
     }
 
     //--------------------------------------------------------------
