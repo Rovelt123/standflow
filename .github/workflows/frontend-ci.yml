@@ -49,15 +49,15 @@ jobs:
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           SSH_KEY: ${{ secrets.SSH_KEY }}
-          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
-          test -n "$SSH_KEY" && test -n "$SSH_KNOWN_HOSTS"
+          test -n "$SSH_KEY"
           test -n "$SERVER_IP" && test -n "$SSH_USER"
           install -d -m 700 ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/standflow
           chmod 600 ~/.ssh/standflow
-          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh-keyscan -T 15 -p "$SSH_PORT" -H "$SERVER_IP" > ~/.ssh/known_hosts
+          test -s ~/.ssh/known_hosts
       - name: Deploy frontend
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         timeout-minutes: 5
