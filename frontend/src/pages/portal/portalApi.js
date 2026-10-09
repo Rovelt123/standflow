@@ -75,7 +75,7 @@ export function updateMarketingConsent(marketingConsent, fetchRequest = fetch) {
 
 //--------------------------------------------------------------
 
-// US5: unsubscribe requires login; the backend has no public unsubscribe-token endpoint.
+// Account settings use the authenticated endpoint; email links use the public token endpoint.
 export function unsubscribeMarketing(fetchRequest = fetch) {
   return consentRequest('/users/me/unsubscribe', 'POST', undefined, fetchRequest)
 }

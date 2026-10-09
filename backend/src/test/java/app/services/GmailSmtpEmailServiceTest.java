@@ -104,6 +104,25 @@ class GmailSmtpEmailServiceTest {
     //--------------------------------------------------------------
 
     @Test
+    void welcomeUsesRegisteredRecipientAndUtf8WithoutPasswordOrMarketingConsent() throws Exception {
+        User recipient = User.builder().email("new@example.com").firstname("Åse")
+                .password("private-password-hash").acceptMarketing(false).build();
+        new GmailSmtpRegistrationEmailService(this::config, this::capture).sendWelcome(recipient);
+        assertEquals(1, sent.size());
+        MimeMessage email = sent.getFirst();
+        assertEnvelope(email, recipient.getEmail());
+        assertEquals("Velkommen til StandFlow", email.getSubject());
+        String body = email.getContent().toString();
+        assertTrue(body.contains("Hej Åse"));
+        assertTrue(body.contains("Din konto hos StandFlow er nu oprettet."));
+        assertTrue(body.contains(app.utils.Utils.getPropertyValue("FRONTEND_URL", "config.properties")));
+        assertFalse(body.contains(recipient.getPassword()));
+        assertEquals("UTF-8", new ContentType(email.getContentType()).getParameter("charset"));
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
     void allProvidersSanitizeTransportErrors() {
         SmtpDelivery failure = message -> { throw new MessagingException("dummy-sensitive-transport-detail"); };
         var application = new GmailSmtpApplicationEmailService(this::config, failure);
@@ -111,6 +130,7 @@ class GmailSmtpEmailServiceTest {
         var chat = new GmailSmtpMessageEmailService(this::config, failure);
         User recipient = User.builder().email("recipient@example.com").build();
         List<Runnable> operations = List.of(
+                () -> new GmailSmtpRegistrationEmailService(this::config, failure).sendWelcome(recipient),
                 () -> application.sendApplication(Application.builder().company("Test").build(), new byte[]{1}, "application.pdf"),
                 () -> newsletter.sendNewsletter(recipient, "Subject", "Body"),
                 () -> chat.sendAdminMessageNotification(recipient, new app.entities.Message()),
@@ -130,6 +150,7 @@ class GmailSmtpEmailServiceTest {
         var newsletter = new GmailSmtpNewsletterEmailService(this::config, this::capture);
         var chat = new GmailSmtpMessageEmailService(this::config, this::capture);
         User invalid = User.builder().email("one@example.com,two@example.com").build();
+        assertThrows(ApiException.class, () -> new GmailSmtpRegistrationEmailService(this::config, this::capture).sendWelcome(invalid));
         assertThrows(ApiException.class, () -> newsletter.sendNewsletter(invalid, "s", "b"));
         assertThrows(ApiException.class, () -> chat.sendCustomerMessageNotification(invalid, new app.entities.Message()));
         SmtpConfig missingReceiver = SmtpConfig.load(directory.resolve("missing"), Map.of(
