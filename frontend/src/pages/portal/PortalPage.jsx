@@ -16,18 +16,19 @@ export default function PortalPage() {
   const [user, setUser] = useState(null)
   const [applications, setApplications] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadedTab, setLoadedTab] = useState(null)
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState(null)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     let active = true
-    Promise.all([getCurrentUser(), portalRequest('/applications/mine')]).then(([profile, list]) => {
+    Promise.all([getCurrentUser(), tab === 'applications' ? portalRequest('/applications/mine') : Promise.resolve([])]).then(([profile, list]) => {
       if (active) { setUser(profile); setApplications(list) }
     }).catch(failure => { if (active) setError(failure.message) })
-      .finally(() => { if (active) setLoading(false) })
+      .finally(() => { if (active) { setLoading(false); setLoadedTab(tab) } })
     return () => { active = false }
-  }, [])
+  }, [tab])
 
   //--------------------------------------------------------------
 
@@ -35,7 +36,7 @@ export default function PortalPage() {
     setBusy(true)
     setError('')
     try {
-      const [profile, list] = await Promise.all([getCurrentUser(), portalRequest('/applications/mine')])
+      const [profile, list] = await Promise.all([getCurrentUser(), tab === 'applications' ? portalRequest('/applications/mine') : Promise.resolve([])])
       setUser(profile)
       setApplications(list)
     } catch (failure) { setError(failure.message) } finally { setBusy(false) }
@@ -60,10 +61,14 @@ export default function PortalPage() {
     </div>
     <nav className={styles.tabs} aria-label="Brugerportal">
       {[['applications', 'Mine ansøgninger'], ['messages', 'Beskeder'], ['settings', 'Profil & indstillinger']].map(([id, label]) =>
-        <button key={id} onClick={() => setParams({ tab: id })} aria-current={tab === id ? 'page' : undefined}>{label}</button>)}
+        <button key={id} onClick={() => {
+          if (id === tab) return
+          setError('')
+          setParams({ tab: id })
+        }} aria-current={tab === id ? 'page' : undefined}>{label}</button>)}
     </nav>
     {error && <p className={styles.error} role="alert">{error} <button disabled={busy} onClick={refresh}>Prøv igen</button></p>}
-    {loading ? <p role="status">Henter dine oplysninger…</p> : <>
+    {loading || loadedTab !== tab ? <p role="status">Henter dine oplysninger…</p> : <>
       {tab === 'applications' && <section>
         <div className={styles.heading}><h2>Mine ansøgninger</h2><div className={styles.actions}>
           <button className={styles.secondary} disabled={busy} onClick={refresh}>Opdater status</button><Link className={styles.button} to="/ansoegning">Ansøg om en stand</Link>

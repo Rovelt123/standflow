@@ -26,16 +26,18 @@ beforeEach(() => {
 //--------------------------------------------------------------
 
 test('registration sends separate boolean consents and saves a session token', async () => {
-  const fields = { email: 'test@example.dk', password: 'Password!', acceptTerms: true, acceptPrivacy: true, acceptMarketing: false }
-  await authenticate(fields, true, async (url, options) => {
-    assert.equal(url, '/api/users/auth/register')
-    assert.equal(options.method, 'POST')
-    assert.deepEqual(JSON.parse(options.body), fields)
-    return { status: 201, json: async () => ({ data: { token } }) }
-  })
-  assert.equal(globalThis.sessionStorage.getItem(tokenKey), token)
-  assert.equal(globalThis.localStorage.getItem(tokenKey), null)
-  assert.equal(getAuthToken(), token)
+  for (const acceptMarketing of [false, true]) {
+    const fields = { email: 'test@example.dk', password: 'Password!', acceptTerms: true, acceptPrivacy: true, acceptMarketing }
+    await authenticate(fields, true, async (url, options) => {
+      assert.equal(url, '/api/users/auth/register')
+      assert.equal(options.method, 'POST')
+      assert.deepEqual(JSON.parse(options.body), fields)
+      return { status: 201, json: async () => ({ data: { token } }) }
+    })
+    assert.equal(globalThis.sessionStorage.getItem(tokenKey), token)
+    assert.equal(globalThis.localStorage.getItem(tokenKey), null)
+    assert.equal(getAuthToken(), token)
+  }
 })
 
 //--------------------------------------------------------------

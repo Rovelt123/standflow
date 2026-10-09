@@ -6,6 +6,8 @@ import app.enums.Role;
 import app.exceptions.ApiException;
 import app.server.Setup;
 import app.utils.ErrorHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
@@ -17,7 +19,9 @@ import java.util.UUID;
 
 public class UserService {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(UserService.class);
     private final UserDAO userDAO;
+    private final RegistrationEmailService registrationEmailService;
 
     //--------------------------------------------------------------
 
@@ -28,7 +32,14 @@ public class UserService {
     //--------------------------------------------------------------
 
     public UserService(UserDAO userDAO) {
+        this(userDAO, new GmailSmtpRegistrationEmailService());
+    }
+
+    //--------------------------------------------------------------
+
+    public UserService(UserDAO userDAO, RegistrationEmailService registrationEmailService) {
         this.userDAO = userDAO;
+        this.registrationEmailService = registrationEmailService;
     }
 
     //--------------------------------------------------------------
@@ -66,7 +77,13 @@ public class UserService {
             throw new ApiException(409, "E-mailadressen er allerede registreret.");
         }
         user.setPassword(PasswordService.hashHelper(password));
-        return userDAO.create(user);
+        User saved = userDAO.create(user);
+        try {
+            registrationEmailService.sendWelcome(saved);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Welcome email failed; registered account retained. Check SMTP configuration or delivery.");
+        }
+        return saved;
     }
 
     //--------------------------------------------------------------

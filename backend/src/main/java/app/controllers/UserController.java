@@ -22,18 +22,31 @@ public class UserController extends BaseController<User, UserDTO> {
 
     private final UserMapper userMapper = new UserMapper();
     private final SecurityService securityService = new SecurityService();
-    private final UserService userService = new UserService();
+    private final UserService userService;
 
     //--------------------------------------------------------------
 
     public UserController() {
+        this(new UserService());
+    }
+
+    //--------------------------------------------------------------
+
+    public UserController(UserService userService) {
         super(User.class, new UserMapper());
+        this.userService = userService;
     }
 
     //--------------------------------------------------------------
 
     public static EndpointGroup registerRoutes() {
-        UserController controller = new UserController();
+        return registerRoutes(new UserService());
+    }
+
+    //--------------------------------------------------------------
+
+    public static EndpointGroup registerRoutes(UserService userService) {
+        UserController controller = new UserController(userService);
         return () -> {
             post("users/auth/register", controller::registerUser, Role.ANYONE);
             post("users/auth/login", controller::login, Role.ANYONE);

@@ -16,7 +16,7 @@ const navItems = [
   { label: 'Stadeholdere', icon: 'standholders', to: '/kontrolpanel/stadeholdere' },
   { label: 'Plantegning', icon: 'sitePlan' },
   { label: 'Økonomi', icon: 'economy' },
-  { label: 'Indstillinger', icon: 'settings' },
+  { label: 'Indstillinger', icon: 'settings', to: '/brugerportal?tab=settings' },
   { label: 'Beskeder', icon: 'economy', to: '/kontrolpanel/beskeder' },
   { label: 'Nyhedsbrev', icon: 'economy', to: '/kontrolpanel/nyhedsbrev' },
 ]
