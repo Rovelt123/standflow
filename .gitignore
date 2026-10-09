@@ -8,3 +8,9 @@ target/
 .idea/
 
 backend/target/
+
+# Local credentials and runtime output
+.env
+.env.*
+!.env.example
+.local/

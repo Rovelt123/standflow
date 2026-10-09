@@ -12,6 +12,8 @@ import app.security.JWTTokenGenerator;
 import app.server.Setup;
 import app.services.PasswordService;
 import app.services.ApplicationService;
+import app.services.UserService;
+import app.exceptions.ApiException;
 import app.services.SimpleApplicationPdfGenerator;
 import app.utils.Utils;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -43,6 +45,8 @@ class UserControllerTest {
     private static EntityManagerFactory emf;
     private static Setup server;
     private static String baseUrl;
+    private static final java.util.List<String> welcomeRecipients = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private static boolean failWelcome;
 
     //--------------------------------------------------------------
 
@@ -50,7 +54,19 @@ class UserControllerTest {
     static void startServer() {
         emf = TestHibernateConfig.getTestEmf();
         server = new Setup(emf.createEntityManager(), 0);
-        server.initialize();
+        server.getApp().exception(ApiException.class, (error, ctx) -> ctx.status(error.getStatus()).result(error.getMessage()));
+        server.getApp().exception(Exception.class, (error, ctx) -> ctx.status(500).result(error.getMessage()));
+        UserService userService = new UserService(new UserDAO(Setup.em), recipient -> {
+            try (var reader = emf.createEntityManager()) {
+                assertNotNull(reader.find(User.class, recipient.getId()));
+            }
+            welcomeRecipients.add(recipient.getEmail());
+            if (failWelcome) throw new ApiException(500, "SMTP failed");
+        });
+        server.getApp().unsafeConfig().router.apiBuilder(() -> path("/api", () -> {
+            UserController.registerRoutes(userService).addEndpoints();
+            ApplicationController.registerRoutes().addEndpoints();
+        }));
         // Exercise persistence and PDF generation without sending real email during tests.
         ApplicationService applicationService = new ApplicationService(new ApplicationDAO(Setup.em),
                 () -> new ApplicationService.IntakeStatus(true, null), Clock.systemUTC(),
@@ -80,6 +96,7 @@ class UserControllerTest {
             request.put("acceptMarketing", marketing);
             HttpResponse<String> response = post("/users/auth/register", request, null);
             assertEquals(201, response.statusCode(), response.body());
+            assertEquals(1, welcomeRecipients.stream().filter(request.get("email")::equals).count());
             JsonNode data = JSON.readTree(response.body()).path("data");
             assertFalse(data.path("token").asText().isBlank());
             assertTrue(data.path("data").path("acceptTerms").asBoolean());
@@ -95,6 +112,28 @@ class UserControllerTest {
                 assertTrue(PasswordService.passwordEquals((String) request.get("password"), saved.getPassword()));
             }
         }
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void welcomeFailureKeepsAccountAndDuplicateOrInvalidRegistrationDoesNotSend() throws Exception {
+        Map<String, Object> body = registration();
+        int before = welcomeRecipients.size();
+        failWelcome = true;
+        try {
+            assertEquals(201, post("/users/auth/register", body, null).statusCode());
+        } finally {
+            failWelcome = false;
+        }
+        assertEquals(before + 1, welcomeRecipients.size());
+        assertEquals(200, post("/users/auth/login", Map.of("email", body.get("email"),
+                "password", body.get("password")), null).statusCode());
+        assertEquals(409, post("/users/auth/register", body, null).statusCode());
+        body = registration();
+        body.put("acceptTerms", false);
+        assertEquals(400, post("/users/auth/register", body, null).statusCode());
+        assertEquals(before + 1, welcomeRecipients.size());
     }
 
     //--------------------------------------------------------------
