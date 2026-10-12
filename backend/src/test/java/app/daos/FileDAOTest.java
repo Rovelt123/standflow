@@ -64,4 +64,39 @@ class FileDAOTest extends MessageTestSupport {
         }
         assertTrue(new FileDAO(em).getAll().isEmpty());
     }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void downloadLookupFetchesRelationshipsWithoutChangingMetadata() {
+        FileDAO files = new FileDAO(em);
+        UploadedFile file = files.create(pending(UUID.randomUUID() + ".pdf"));
+        var chatMessage = message(alice, admin, "Documents", "Attached", 0, false);
+        files.inTransaction(() -> { file.setMessage(chatMessage); return null; });
+        try (var reader = emf.createEntityManager()) {
+            UploadedFile found = new FileDAO(reader).findForDownload(file.getId());
+            reader.close();
+            assertEquals(file.getStorageKey(), found.getStorageKey());
+            assertEquals(file.getOriginalName(), found.getOriginalName());
+            assertEquals(alice.getId(), found.getUploadedBy().getId());
+            assertEquals(chatMessage.getId(), found.getMessage().getId());
+            assertEquals(alice.getId(), found.getMessage().getSender().getId());
+            assertEquals(admin.getId(), found.getMessage().getRecipient().getId());
+        }
+        assertEquals(1, files.getAll().size());
+        assertFalse(reload(chatMessage.getId()).isRead());
+        assertEquals(file.getUploadedAt(), files.findForDownload(file.getId()).getUploadedAt());
+        assertNull(files.findForDownload(UUID.randomUUID()));
+        assertEquals(dao.getAdmins().stream().map(app.entities.User::getId).toList(),
+                files.getAdmins().stream().map(app.entities.User::getId).toList());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void downloadLookupRetainsPendingState() {
+        FileDAO files = new FileDAO(em);
+        UploadedFile pending = files.create(pending(UUID.randomUUID() + ".pdf"));
+        assertNull(files.findForDownload(pending.getId()).getMessage());
+    }
 }

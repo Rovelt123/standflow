@@ -46,6 +46,8 @@ class FileControllerTest extends MessageTestSupport {
     private Javalin server;
     private HttpClient client;
     private jakarta.persistence.EntityManager previousEm;
+    private FileService files;
+    private LocalFileStorage storage;
     private static final String TEST_KEY = "file-upload-test-signing-key-32-bytes-minimum";
     private static final String BOUNDARY = "file-upload-test-boundary";
 
@@ -84,7 +86,8 @@ class FileControllerTest extends MessageTestSupport {
                 };
             }
         });
-        FileService files = new FileService(new FileDAO(em), new LocalFileStorage(temporary), new FileValidator(), Clock.systemUTC());
+        storage = new LocalFileStorage(temporary);
+        files = new FileService(new FileDAO(em), storage, new FileValidator(), Clock.systemUTC());
         server = Javalin.create(config -> {
             config.showJavalinBanner = false;
             FileController.configureMultipart(config);
@@ -258,5 +261,187 @@ class FileControllerTest extends MessageTestSupport {
             assertFalse(response.body().contains(temporary.toString()));
             assertFalse(response.body().contains("Internal"));
         }
+    }
+
+    //--------------------------------------------------------------
+
+    private UUID attached(User sender, String name, byte[] content) {
+        var uploaded = files.upload(sender.getId(), List.of(app.services.FileValidatorTest.upload(name, content))).getFirst();
+        var chatMessage = message(sender, sender == admin ? alice : admin, "Download", "Attached", 0, false);
+        new FileDAO(em).inTransaction(() -> {
+            new FileDAO(em).getById(uploaded.id()).setMessage(chatMessage);
+            return null;
+        });
+        return uploaded.id();
+    }
+
+    //--------------------------------------------------------------
+
+    private HttpResponse<byte[]> getFile(String route, String jwt) throws Exception {
+        var request = HttpRequest.newBuilder(URI.create("http://localhost:" + server.port() + route)).GET();
+        if (jwt != null) request.header("Authorization", "Bearer " + jwt);
+        return client.send(request.build(), HttpResponse.BodyHandlers.ofByteArray());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void downloadsAllFormatsForBothParticipantsWithCorrectBytesAndHeaders() throws Exception {
+        for (String format : List.of("pdf", "png", "jpg", "jpeg")) {
+            byte[] content = format.equals("pdf") ? pdf(0) : image(format.equals("png") ? "png" : "jpg");
+            String name = format.equals("pdf") ? "læse \"aftale\".pdf" : "original." + format;
+            UUID id = attached(format.equals("png") ? admin : alice, name, content);
+            String route = "/api/files/" + id;
+            for (User requester : List.of(alice, admin)) {
+                var response = getFile(route, token(requester));
+                assertEquals(200, response.statusCode());
+                assertArrayEquals(content, response.body());
+                assertEquals(Integer.toString(content.length), response.headers().firstValue("Content-Length").orElseThrow());
+                String type = format.equals("pdf") ? "application/pdf" : format.equals("png") ? "image/png" : "image/jpeg";
+                assertEquals(type, response.headers().firstValue("Content-Type").orElseThrow());
+                String disposition = response.headers().firstValue("Content-Disposition").orElseThrow();
+                assertTrue(disposition.startsWith("attachment; filename=\""));
+                assertTrue(disposition.contains("filename*=UTF-8''" + java.net.URLEncoder.encode(name, StandardCharsets.UTF_8).replace("+", "%20")));
+                if (format.equals("pdf")) assertTrue(disposition.contains("filename=\"l_se \\\"aftale\\\".pdf\""));
+                assertEquals("no-store", response.headers().firstValue("Cache-Control").orElseThrow());
+                assertEquals("nosniff", response.headers().firstValue("X-Content-Type-Options").orElseThrow());
+            }
+            assertTrue(storage.exists(new FileDAO(em).getById(id).getStorageKey()));
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void downloadAuthenticationIdsAndHiddenAttachmentsHaveExpectedStatuses() throws Exception {
+        UUID id = attached(alice, "a.png", image("png"));
+        String path = "/api/files/" + id;
+        assertEquals(401, getFile(path, null).statusCode());
+        assertEquals(401, getFile(path, "invalid").statusCode());
+        SignedJWT expired = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), new JWTClaimsSet.Builder()
+                .subject(alice.getId().toString()).expirationTime(new Date(0)).build());
+        expired.sign(new MACSigner(TEST_KEY));
+        assertEquals(401, getFile(path, expired.serialize()).statusCode());
+        assertEquals(404, getFile(path, token(owner)).statusCode());
+        assertEquals(404, getFile(path, token(bob)).statusCode());
+        for (String invalid : List.of("invalid", "1-1-1-1-1", id + "extra")) {
+            assertEquals(400, getFile("/api/files/" + invalid, token(alice)).statusCode());
+        }
+        var missing = getFile("/api/files/" + UUID.randomUUID(), token(alice));
+        assertEquals(404, missing.statusCode());
+        assertArrayEquals(missing.body(), getFile(path, token(bob)).body());
+        var pending = files.upload(alice.getId(), List.of(app.services.FileValidatorTest.upload("pending.png", image("png")))).getFirst();
+        assertEquals(404, getFile("/api/files/" + pending.id(), token(alice)).statusCode());
+        storage.delete(new FileDAO(em).getById(id).getStorageKey());
+        assertEquals(404, getFile(path, token(alice)).statusCode());
+        assertNotNull(new FileDAO(em).getById(id));
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void downloadDatabaseAndStorageFailuresReturnSafeServerErrors() throws Exception {
+        UUID id = attached(alice, "a.png", image("png"));
+        LocalFileStorage failedStorage = new LocalFileStorage(temporary) {
+            @Override public StoredFile open(String key) throws java.io.IOException {
+                throw new java.io.IOException("Sensitive filesystem path " + temporary);
+            }
+        };
+        FileDAO failedDatabase = new FileDAO(em) {
+            @Override public app.entities.UploadedFile findForDownload(UUID fileId) {
+                throw new IllegalStateException("Sensitive database details");
+            }
+        };
+        for (boolean database : List.of(false, true)) {
+            String prefix = database ? "/api/database-download" : "/api/storage-download";
+            FileService broken = new FileService(database ? failedDatabase : new FileDAO(em), failedStorage, new FileValidator(), Clock.systemUTC());
+            server.unsafeConfig().router.apiBuilder(() -> path(prefix, FileController.registerRoutes(broken)));
+            var response = getFile(prefix + "/files/" + id, token(alice));
+            assertEquals(500, response.statusCode());
+            assertFalse(new String(response.body(), StandardCharsets.UTF_8).contains("Sensitive"));
+            assertFalse(new String(response.body(), StandardCharsets.UTF_8).contains(temporary.toString()));
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void successfulAndFailedTransfersCloseTheirStreams() throws Exception {
+        byte[] content = image("png");
+        UUID id = attached(alice, "a.png", content);
+        for (boolean failRead : List.of(false, true)) {
+            var closed = new java.util.concurrent.CountDownLatch(1);
+            LocalFileStorage tracking = new LocalFileStorage(temporary) {
+                @Override public StoredFile open(String key) throws java.io.IOException {
+                    var opened = super.open(key);
+                    return new StoredFile(new java.io.FilterInputStream(opened.content()) {
+                        @Override public int read(byte[] bytes, int offset, int length) throws java.io.IOException {
+                            if (failRead) throw new java.io.IOException("Sensitive read failure " + temporary);
+                            return super.read(bytes, offset, length);
+                        }
+                        @Override public void close() throws java.io.IOException {
+                            try { super.close(); } finally { closed.countDown(); }
+                        }
+                    }, opened.size());
+                }
+            };
+            String prefix = failRead ? "/api/read-failure" : "/api/stream-success";
+            var tracked = new FileService(new FileDAO(em), tracking, new FileValidator(), Clock.systemUTC());
+            server.unsafeConfig().router.apiBuilder(() -> path(prefix, FileController.registerRoutes(tracked)));
+            try {
+                var response = getFile(prefix + "/files/" + id, token(alice));
+                if (!failRead) assertArrayEquals(content, response.body());
+                else assertFalse(new String(response.body(), StandardCharsets.UTF_8).contains("Sensitive"));
+            } catch (java.io.IOException exception) {
+                assertTrue(failRead, "Successful transfer must not fail");
+            }
+            assertTrue(closed.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void clientDisconnectClosesDownloadStream() throws Exception {
+        UUID id = attached(alice, "large.pdf", pdf(FileValidator.MAX_SIZE));
+        var firstRead = new java.util.concurrent.CountDownLatch(1);
+        var releaseRead = new java.util.concurrent.CountDownLatch(1);
+        var closed = new java.util.concurrent.CountDownLatch(1);
+        LocalFileStorage tracking = new LocalFileStorage(temporary) {
+            @Override public StoredFile open(String key) throws java.io.IOException {
+                var opened = super.open(key);
+                return new StoredFile(new java.io.FilterInputStream(opened.content()) {
+                    private boolean first = true;
+                    @Override public int read(byte[] bytes, int offset, int length) throws java.io.IOException {
+                        if (first) {
+                            first = false;
+                            firstRead.countDown();
+                            try {
+                                if (!releaseRead.await(5, java.util.concurrent.TimeUnit.SECONDS)) throw new java.io.IOException("Read gate timed out");
+                            } catch (InterruptedException exception) {
+                                Thread.currentThread().interrupt();
+                                throw new java.io.IOException("Read interrupted", exception);
+                            }
+                        }
+                        return super.read(bytes, offset, length);
+                    }
+                    @Override public void close() throws java.io.IOException {
+                        try { super.close(); } finally { closed.countDown(); }
+                    }
+                }, opened.size());
+            }
+        };
+        var tracked = new FileService(new FileDAO(em), tracking, new FileValidator(), Clock.systemUTC());
+        server.unsafeConfig().router.apiBuilder(() -> path("/api/disconnect", FileController.registerRoutes(tracked)));
+        try (var socket = new java.net.Socket("localhost", server.port())) {
+            socket.setSoLinger(true, 0);
+            String request = "GET /api/disconnect/files/" + id + " HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer " + token(alice) + "\r\nConnection: close\r\n\r\n";
+            socket.getOutputStream().write(request.getBytes(StandardCharsets.US_ASCII));
+            socket.getOutputStream().flush();
+            assertTrue(firstRead.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        } finally {
+            releaseRead.countDown();
+        }
+        assertTrue(closed.await(5, java.util.concurrent.TimeUnit.SECONDS));
     }
 }

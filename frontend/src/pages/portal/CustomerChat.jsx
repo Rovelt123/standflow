@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { portalRequest, uploadFiles } from './portalApi.js'
+import { useEffect, useRef, useState } from 'react'
+import { portalRequest, uploadFiles, downloadFile } from './portalApi.js'
 import FileUpload from './FileUpload.jsx'
 import styles from './CustomerChat.module.css'
 
@@ -13,6 +13,24 @@ export default function CustomerChat({ user }) {
   const [files, setFiles] = useState([])
   const [attachmentIds, setAttachmentIds] = useState([])
   const [uploading, setUploading] = useState(false)
+  const [downloads, setDownloads] = useState({})
+  const downloadsInFlight = useRef(new Set())
+
+  //--------------------------------------------------------------
+
+  async function handleDownload(file) {
+    if (downloadsInFlight.current.has(file.id)) return
+    downloadsInFlight.current.add(file.id)
+    setDownloads(current => ({ ...current, [file.id]: { loading: true, error: '' } }))
+    try {
+      await downloadFile(file.id, file.originalName)
+    } catch (failure) {
+      setDownloads(current => ({ ...current, [file.id]: { loading: true, error: failure.message } }))
+    } finally {
+      downloadsInFlight.current.delete(file.id)
+      setDownloads(current => ({ ...current, [file.id]: { ...current[file.id], loading: false } }))
+    }
+  }
 
   useEffect(() => {
     let active = true
@@ -103,7 +121,15 @@ export default function CustomerChat({ user }) {
                         {currentMessage.body}
                         {currentMessage.attachments?.length > 0 && (
                           <ul className={styles.attachments} aria-label="Vedhæftede filer">
-                            {currentMessage.attachments.map(file => <li key={file.id}>{file.originalName}</li>)}
+                            {currentMessage.attachments.map(file => (
+                              <li key={file.id}>
+                                <button type="button" className={styles.attachmentLink}
+                                  disabled={downloads[file.id]?.loading} aria-busy={downloads[file.id]?.loading || undefined}
+                                  onClick={() => handleDownload(file)}>{file.originalName}</button>
+                                {downloads[file.id]?.loading && <span role="status"> Forbereder download…</span>}
+                                {downloads[file.id]?.error && <span className={styles.downloadError} role="alert"> {downloads[file.id].error}</span>}
+                              </li>
+                            ))}
                           </ul>
                         )}
                     </div>

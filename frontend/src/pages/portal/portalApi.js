@@ -66,6 +66,57 @@ export async function uploadFiles(files, fetchRequest = fetch) {
 
 //--------------------------------------------------------------
 
+export async function downloadFile(fileId, originalName, fetchRequest = fetch) {
+  const token = getAuthToken()
+  if (!token) throw new Error('Log ind igen for at fortsætte.')
+  let response
+  try {
+    response = await fetchRequest(`${apiBaseUrl}/files/${encodeURIComponent(fileId)}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    })
+  } catch {
+    throw new Error('Forbindelsen blev afbrudt. Filen blev ikke downloadet.')
+  }
+  if (response.status === 401) {
+    clearAuth()
+    throw new Error('Din session er udløbet. Log ind igen.')
+  }
+  if (response.status === 400) throw new Error('Filens id er ugyldigt.')
+  if ([403, 404].includes(response.status)) throw new Error('Filen findes ikke eller er ikke tilgængelig.')
+  if (response.status !== 200) throw new Error('Filen kunne ikke downloades. Prøv igen senere.')
+  let blob
+  try {
+    blob = await response.blob()
+  } catch {
+    throw new Error('Filen kunne ikke modtages. Prøv igen senere.')
+  }
+  let url
+  let anchor
+  let started = false
+  try {
+    url = URL.createObjectURL(blob)
+    anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = originalName
+    document.body.appendChild(anchor)
+    anchor.click()
+    started = true
+  } catch {
+    throw new Error('Download kunne ikke startes. Prøv igen senere.')
+  } finally {
+    anchor?.remove()
+    if (url) {
+      // Allow the browser to begin reading the Blob before releasing its URL.
+      if (started) setTimeout(() => URL.revokeObjectURL(url), 1000)
+      else URL.revokeObjectURL(url)
+    }
+  }
+}
+
+//--------------------------------------------------------------
+
 export async function saveProfile(body, passwordOnly = false) {
   const result = await portalRequest(passwordOnly ? '/users/me/password' : '/users/me', 'PUT', body)
   replaceAuthToken(result.token)

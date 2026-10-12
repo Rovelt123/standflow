@@ -14,12 +14,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.FilterInputStream;
+import java.io.InputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
 import static io.javalin.apibuilder.ApiBuilder.post;
+import static io.javalin.apibuilder.ApiBuilder.get;
 
 public class FileController {
     private static final Logger LOGGER = LoggerFactory.getLogger(FileController.class);
@@ -36,7 +42,99 @@ public class FileController {
 
     public static EndpointGroup registerRoutes(FileService service) {
         FileController controller = new FileController(service);
-        return () -> post("/files", controller::upload, app.enums.Role.USER, app.enums.Role.ADMIN);
+        return () -> {
+            post("/files", controller::upload, app.enums.Role.USER, app.enums.Role.ADMIN);
+            get("/files/{fileId}", controller::download, app.enums.Role.USER, app.enums.Role.ADMIN);
+        };
+    }
+
+    //--------------------------------------------------------------
+
+    private void download(Context ctx) {
+        UserDTO user = ctx.attribute("user");
+        if (user == null || user.getId() == null) throw new ApiException(401, "Login er påkrævet.");
+        FileService.Download download = service.download(user.getId(), parseFileId(ctx.pathParam("fileId")));
+        boolean handedToJavalin = false;
+        try {
+            ctx.status(200).contentType(download.metadata().contentType())
+                    .header("Content-Disposition", contentDisposition(download.metadata().originalName()))
+                    .header("Content-Length", Long.toString(download.metadata().size()))
+                    .header("Cache-Control", "no-store")
+                    .header("X-Content-Type-Options", "nosniff")
+                    .disableCompression()
+                    .result(transferStream(download.content()));
+            // Javalin closes result streams in a finally block, including on client disconnect.
+            handedToJavalin = true;
+        } catch (RuntimeException exception) {
+            LOGGER.error("Could not prepare file download response.", exception);
+            throw new ApiException(500, "Filen kunne ikke downloades. Prøv igen senere.");
+        } finally {
+            if (!handedToJavalin) {
+                try {
+                    download.close();
+                } catch (IOException exception) {
+                    LOGGER.warn("Could not close file download stream.", exception);
+                }
+            }
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    private UUID parseFileId(String id) {
+        if (!id.matches("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")) {
+            throw new ApiException(400, "Filens id er ugyldigt.");
+        }
+        return UUID.fromString(id);
+    }
+
+    //--------------------------------------------------------------
+
+    private String contentDisposition(String originalName) {
+        String fallback = originalName.replaceAll("[^\\x20-\\x7E]", "_")
+                .replace("\\", "\\\\").replace("\"", "\\\"");
+        String encoded = URLEncoder.encode(originalName, StandardCharsets.UTF_8).replace("+", "%20").replace("*", "%2A");
+        return "attachment; filename=\"" + fallback + "\"; filename*=UTF-8''" + encoded;
+    }
+
+    //--------------------------------------------------------------
+
+    private InputStream transferStream(InputStream input) {
+        return new FilterInputStream(input) {
+            @Override
+            public int read() throws IOException {
+                try {
+                    return in.read();
+                } catch (IOException exception) {
+                    LOGGER.warn("File download transfer interrupted.", exception);
+                    throw new IOException("File download transfer failed.", exception);
+                }
+            }
+
+            //--------------------------------------------------------------
+
+            @Override
+            public int read(byte[] bytes, int offset, int length) throws IOException {
+                try {
+                    return in.read(bytes, offset, length);
+                } catch (IOException exception) {
+                    LOGGER.warn("File download transfer interrupted.", exception);
+                    throw new IOException("File download transfer failed.", exception);
+                }
+            }
+
+            //--------------------------------------------------------------
+
+            @Override
+            public void close() throws IOException {
+                try {
+                    super.close();
+                } catch (IOException exception) {
+                    LOGGER.warn("Could not close file download transfer.", exception);
+                    throw new IOException("File download transfer could not be closed.", exception);
+                }
+            }
+        };
     }
 
     //--------------------------------------------------------------

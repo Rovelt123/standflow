@@ -1,8 +1,9 @@
-/* global File, FormData, sessionStorage */
+/* global File, FormData, sessionStorage, URL, Blob */
 import test, { beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { Buffer } from 'node:buffer'
-import { portalRequest, uploadFiles, validateSelectedFiles } from '../src/pages/portal/portalApi.js'
+import { portalRequest, uploadFiles, validateSelectedFiles, downloadFile } from '../src/pages/portal/portalApi.js'
+import { getAuthToken } from '../src/pages/public/authApi.js'
 
 const token = `header.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 86400 })).toString('base64url')}.signature`
 
@@ -82,4 +83,85 @@ test('existing text-only JSON requests remain unchanged', async () => {
     assert.deepEqual(JSON.parse(options.body), { subject: 'Subject', body: 'Body' })
     return { status: 201, json: async () => ({ id: 'text-only', attachments: [] }) }
   })
+})
+
+//--------------------------------------------------------------
+
+function downloadDom(t, failClick = false) {
+  const calls = { blobs: [], appended: 0, clicked: 0, removed: 0, revoked: [], timers: [] }
+  const anchor = {
+    href: '', download: '',
+    click() { calls.clicked++; if (failClick) throw new Error('Browser failure') },
+    remove() { calls.removed++ },
+  }
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'document')
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: {
+    createElement: tag => { assert.equal(tag, 'a'); return anchor },
+    body: { appendChild: element => { assert.equal(element, anchor); calls.appended++ } },
+  } })
+  t.after(() => { if (original) Object.defineProperty(globalThis, 'document', original); else delete globalThis.document })
+  t.mock.method(URL, 'createObjectURL', blob => { calls.blobs.push(blob); return 'blob:download-fixture' })
+  t.mock.method(URL, 'revokeObjectURL', url => calls.revoked.push(url))
+  t.mock.method(globalThis, 'setTimeout', (callback, delay) => { calls.timers.push({ callback, delay }); return 0 })
+  return { calls, anchor }
+}
+
+//--------------------------------------------------------------
+
+test('authenticated downloads preserve bytes and original filenames for PDF and images', async t => {
+  const { calls, anchor } = downloadDom(t)
+  for (const extension of ['pdf', 'png', 'jpg', 'jpeg']) {
+    const filename = `læse "original".${extension}`
+    const content = new Blob(['original bytes'], { type: extension === 'pdf' ? 'application/pdf' : extension === 'png' ? 'image/png' : 'image/jpeg' })
+    await downloadFile('file-id', filename, async (url, options) => {
+      assert.equal(url, '/api/files/file-id')
+      assert.equal(options.method, 'GET')
+      assert.deepEqual(options.headers, { Authorization: `Bearer ${token}` })
+      assert.equal(options.body, undefined)
+      assert.equal(options.cache, 'no-store')
+      return { status: 200, blob: async () => content }
+    })
+    assert.equal(anchor.download, filename)
+    assert.equal(anchor.href, 'blob:download-fixture')
+    assert.equal(anchor.target, undefined)
+    assert.equal(await calls.blobs.at(-1).text(), 'original bytes')
+  }
+  assert.equal(calls.appended, 4)
+  assert.equal(calls.clicked, 4)
+  assert.equal(calls.removed, 4)
+  assert.equal(calls.revoked.length, 0)
+  calls.timers.forEach(timer => { assert.equal(timer.delay, 1000); timer.callback() })
+  assert.equal(calls.revoked.length, 4)
+})
+
+//--------------------------------------------------------------
+
+test('download failures never create a download or reveal technical server details', async t => {
+  const { calls } = downloadDom(t)
+  for (const status of [400, 403, 404, 500, 201, 204]) {
+    await assert.rejects(downloadFile('file-id', 'original.pdf', async () => ({ status, text: async () => 'Internal path or database details' })),
+      error => !error.message.includes('Internal'))
+    assert.equal(getAuthToken(), token)
+  }
+  await assert.rejects(downloadFile('file-id', 'original.pdf', async () => { throw new Error('Network failure') }), /Forbindelsen/)
+  await assert.rejects(downloadFile('file-id', 'original.pdf', async () => ({ status: 200, blob: async () => { throw new Error('Partial transfer') } })), /modtages/)
+  assert.equal(calls.clicked, 0)
+  assert.equal(calls.blobs.length, 0)
+  await assert.rejects(downloadFile('file-id', 'original.pdf', async () => ({ status: 401 })), /session er udløbet/)
+  assert.equal(getAuthToken(), null)
+  await assert.rejects(downloadFile('file-id', 'original.pdf', async () => assert.fail('Unauthenticated request')), /Log ind igen/)
+})
+
+//--------------------------------------------------------------
+
+test('download URL encodes the ID and a browser failure releases its temporary resources', async t => {
+  const { calls } = downloadDom(t, true)
+  await assert.rejects(downloadFile('../path', 'original.pdf', async (url, options) => {
+    assert.equal(url, '/api/files/..%2Fpath')
+    assert.equal(options.headers.Authorization, `Bearer ${token}`)
+    return { status: 200, blob: async () => new Blob(['content']) }
+  }), /ikke startes/)
+  assert.equal(calls.removed, 1)
+  assert.deepEqual(calls.revoked, ['blob:download-fixture'])
+  assert.equal(calls.timers.length, 0)
 })

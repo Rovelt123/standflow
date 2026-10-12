@@ -57,4 +57,54 @@ class LocalFileStorageTest {
         Files.delete(temporary.resolve("removed"));
         assertThrows(IOException.class, () -> storage.store(new byte[]{ 1 }, "pdf"));
     }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void opensCorrectContentReadOnlyAndClosesItsChannel() throws Exception {
+        LocalFileStorage storage = new LocalFileStorage(temporary);
+        byte[] expected = { 1, 2, 3, 4 };
+        String key = storage.store(expected, "pdf");
+        var modifiedAt = Files.getLastModifiedTime(temporary.resolve(key));
+        var opened = storage.open(key);
+        try (opened) {
+            assertEquals(expected.length, opened.size());
+            assertArrayEquals(expected, opened.content().readAllBytes());
+        }
+        assertThrows(IOException.class, () -> opened.content().read());
+        assertArrayEquals(expected, Files.readAllBytes(temporary.resolve(key)));
+        assertEquals(modifiedAt, Files.getLastModifiedTime(temporary.resolve(key)));
+        assertTrue(storage.exists(key));
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void readRejectsMissingNonregularAndTraversalPaths() throws Exception {
+        LocalFileStorage storage = new LocalFileStorage(temporary);
+        assertThrows(java.nio.file.NoSuchFileException.class, () -> storage.open(UUID.randomUUID() + ".pdf"));
+        String directoryKey = UUID.randomUUID() + ".pdf";
+        Files.createDirectory(temporary.resolve(directoryKey));
+        assertThrows(java.nio.file.NoSuchFileException.class, () -> storage.open(directoryKey));
+        for (String key : java.util.List.of("../outside.pdf", "..\\outside.pdf", temporary.resolve("outside.pdf").toString())) {
+            assertThrows(IllegalArgumentException.class, () -> storage.open(key));
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void readDoesNotFollowSymbolicLinks() throws Exception {
+        LocalFileStorage storage = new LocalFileStorage(temporary.resolve("uploads"));
+        Path outside = temporary.resolve("outside.pdf");
+        Files.write(outside, new byte[]{ 42 });
+        String key = UUID.randomUUID() + ".pdf";
+        try {
+            Files.createSymbolicLink(temporary.resolve("uploads").resolve(key), outside);
+        } catch (java.nio.file.FileSystemException | UnsupportedOperationException exception) {
+            org.junit.jupiter.api.Assumptions.assumeTrue(false, "Platform does not permit creation of symbolic links.");
+        }
+        assertThrows(java.nio.file.NoSuchFileException.class, () -> storage.open(key));
+        assertArrayEquals(new byte[]{ 42 }, Files.readAllBytes(outside));
+    }
 }

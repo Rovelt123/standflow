@@ -204,4 +204,102 @@ class FileServiceTest extends MessageTestSupport {
         }
         assertTrue(storage.exists(key));
     }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void bothParticipantsCanDownloadEitherSendersAttachmentsWithoutChanges() throws Exception {
+        FileDAO dao = new FileDAO(em);
+        LocalFileStorage storage = new LocalFileStorage(temporary);
+        var fileService = files(dao, storage);
+        for (var sender : List.of(alice, admin)) {
+            byte[] content = image("png");
+            var uploaded = fileService.upload(sender.getId(), List.of(upload("original.png", content))).getFirst();
+            var message = sender == alice
+                    ? service.sendCustomer(alice.getId(), Map.of("subject", "Documents", "body", "Attached", "attachmentIds", List.of(uploaded.id().toString())))
+                    : service.sendAdmin(admin.getId(), alice.getId(), Map.of("body", "Reply", "attachmentIds", List.of(uploaded.id().toString())));
+            for (var requester : List.of(alice, admin)) {
+                try (var download = fileService.download(requester.getId(), uploaded.id())) {
+                    assertEquals("original.png", download.metadata().originalName());
+                    assertEquals("image/png", download.metadata().contentType());
+                    assertArrayEquals(content, download.content().readAllBytes());
+                }
+            }
+            assertEquals(message.getId(), dao.findForDownload(uploaded.id()).getMessage().getId());
+            assertEquals(now, dao.findForDownload(uploaded.id()).getUploadedAt());
+            assertFalse(reload(message.getId()).isRead());
+            assertTrue(storage.exists(dao.getById(uploaded.id()).getStorageKey()));
+        }
+        assertEquals(2, dao.getAll().size());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void unavailableAndUnauthorizedRequestsNeverAccessStorage() throws Exception {
+        FileDAO dao = new FileDAO(em);
+        LocalFileStorage storage = new LocalFileStorage(temporary);
+        var uploaded = files(dao, storage).upload(alice.getId(), List.of(upload("a.png", image("png")))).getFirst();
+        FileService guarded = files(dao, new LocalFileStorage(temporary) {
+            @Override public StoredFile open(String key) { fail("Unauthorized download accessed storage"); return null; }
+        });
+        assertEquals(401, assertThrows(ApiException.class, () -> guarded.download(null, uploaded.id())).getStatus());
+        assertEquals(400, assertThrows(ApiException.class, () -> guarded.download(alice.getId(), null)).getStatus());
+        assertEquals(404, assertThrows(ApiException.class, () -> guarded.download(alice.getId(), UUID.randomUUID())).getStatus());
+        assertEquals(404, assertThrows(ApiException.class, () -> guarded.download(alice.getId(), uploaded.id())).getStatus());
+        assertEquals(404, assertThrows(ApiException.class, () -> guarded.download(owner.getId(), uploaded.id())).getStatus());
+        service.sendCustomer(alice.getId(), Map.of("subject", "Documents", "body", "Attached", "attachmentIds", List.of(uploaded.id().toString())));
+        assertEquals(404, assertThrows(ApiException.class, () -> guarded.download(bob.getId(), uploaded.id())).getStatus());
+        // Ownership alone cannot authorize an attachment associated with another conversation.
+        var bobMessage = message(bob, admin, "Other", "Body", 1, false);
+        dao.inTransaction(() -> { dao.getById(uploaded.id()).setMessage(bobMessage); return null; });
+        assertEquals(404, assertThrows(ApiException.class, () -> guarded.download(alice.getId(), uploaded.id())).getStatus());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void adminCannotDownloadConversationOutsideCurrentChatPolicy() throws Exception {
+        FileDAO dao = new FileDAO(em);
+        LocalFileStorage storage = new LocalFileStorage(temporary);
+        var uploaded = files(dao, storage).upload(alice.getId(), List.of(upload("a.png", image("png")))).getFirst();
+        var unrelated = message(alice, bob, "Unrelated", "Body", 0, false);
+        dao.inTransaction(() -> { dao.getById(uploaded.id()).setMessage(unrelated); return null; });
+        assertEquals(404, assertThrows(ApiException.class, () -> files(dao, storage).download(admin.getId(), uploaded.id())).getStatus());
+        var current = message(alice, admin, "Current", "Body", 1, false);
+        dao.inTransaction(() -> { dao.getById(uploaded.id()).setMessage(current); return null; });
+        user("Other admin", "Other", app.enums.Role.ADMIN);
+        assertEquals(500, assertThrows(ApiException.class, () -> files(dao, storage).download(admin.getId(), uploaded.id())).getStatus());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void missingUnreadableAndInconsistentContentHaveSafeErrorsAndCloseStreams() throws Exception {
+        FileDAO dao = new FileDAO(em);
+        LocalFileStorage storage = new LocalFileStorage(temporary);
+        var uploaded = files(dao, storage).upload(alice.getId(), List.of(upload("a.png", image("png")))).getFirst();
+        service.sendCustomer(alice.getId(), Map.of("subject", "Documents", "body", "Attached", "attachmentIds", List.of(uploaded.id().toString())));
+        LocalFileStorage unreadable = new LocalFileStorage(temporary) {
+            @Override public StoredFile open(String key) throws IOException {
+                throw new java.nio.file.AccessDeniedException("Internal path: " + temporary);
+            }
+        };
+        var error = assertThrows(ApiException.class, () -> files(dao, unreadable).download(alice.getId(), uploaded.id()));
+        assertEquals(500, error.getStatus());
+        assertFalse(error.getMessage().contains(temporary.toString()));
+        boolean[] closed = { false };
+        LocalFileStorage inconsistent = new LocalFileStorage(temporary) {
+            @Override public StoredFile open(String key) {
+                return new StoredFile(new java.io.ByteArrayInputStream(new byte[]{ 1 }) {
+                    @Override public void close() { closed[0] = true; }
+                }, 1);
+            }
+        };
+        assertEquals(500, assertThrows(ApiException.class, () -> files(dao, inconsistent).download(alice.getId(), uploaded.id())).getStatus());
+        assertTrue(closed[0]);
+        storage.delete(dao.getById(uploaded.id()).getStorageKey());
+        assertEquals(404, assertThrows(ApiException.class, () -> files(dao, storage).download(alice.getId(), uploaded.id())).getStatus());
+        assertNotNull(dao.getById(uploaded.id()));
+    }
 }

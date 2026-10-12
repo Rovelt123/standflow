@@ -304,7 +304,6 @@ The endpoint must use the application's existing exception and error-handling ar
 |---|---|
 | `400 Bad Request` | Missing files, empty files, more than 3 files, invalid attachment IDs, or invalid multipart request |
 | `401 Unauthorized` | Missing or invalid authentication |
-| `403 Forbidden` | Authenticated user lacks the required role or permission |
 | `404 Not Found` | Referenced attachment does not exist |
 | `413 Content Too Large` | Any file exceeds the configured upload limit |
 | `415 Unsupported Media Type` | Unsupported or invalid file format |
@@ -326,41 +325,48 @@ Error responses must follow the existing application's error response structure.
 
 ## 10. Files to Create
 
+No new production files are currently required.
+
+The download functionality should reuse and extend the existing file upload implementation from FILE-01.
+
+If the agent determines that additional files are necessary, it must explain why and request permission before creating them.
+
+The test files specified in section 16 may be created if they do not already exist. Existing test files should be extended where appropriate.
+
+## 11. Files Allowed to Modify
+
+**Backend:**
+
 - `backend/src/main/java/app/daos/FileDAO.java`
 - `backend/src/main/java/app/controllers/FileController.java`
 - `backend/src/main/java/app/services/FileService.java`
 - `backend/src/main/java/app/services/LocalFileStorage.java`
 - `backend/src/main/java/app/dtos/FileDTO.java`
-- `backend/src/main/java/app/services/FileValidator.java`
-- `frontend/src/pages/portal/FileUpload.jsx`
-- `frontend/src/pages/portal/FileUpload.module.css`
+- `backend/src/main/java/app/server/Routing.java`
 
-The test files specified in section 16 may also be created.
+**Frontend:**
 
-## 11. Files Allowed to Modify
-
-- `backend/src/main/java/app/entities/UploadedFile.java`
 - `frontend/src/pages/portal/CustomerChat.jsx`
 - `frontend/src/pages/portal/CustomerChat.module.css`
 - `frontend/src/pages/portal/portalApi.js`
-- `frontend/src/App.jsx`
-- `frontend/src/styles/tokens.css`
 - `frontend/src/pages/kontrolpanel/MessagesPage.jsx`
 - `frontend/src/pages/kontrolpanel/MessagesPage.module.css`
-- `backend/src/main/java/app/server/Routing.java`
-- `backend/src/main/java/app/configs/EntityRegistry.java`
-- `backend/src/main/java/app/controllers/MessageController.java`
-- `backend/src/main/java/app/controllers/UserController.java`
-- `backend/src/main/java/app/services/ConversationService.java`
-- `backend/src/main/java/app/dtos/MessageDTO.java`
-- `backend/src/main/java/app/mappers/MessageMapper.java`
-- `backend/src/main/java/app/daos/MessageDAO.java`
 
-Only modify existing files when necessary for implementing the ticket.
+Only modify existing files when necessary for implementing the download functionality.
+
+Before making changes, inspect the existing implementation to determine which files actually require modification.
+
+Do not refactor unrelated functionality or modify existing upload behavior unless strictly necessary.
+
+IT IS ALLOWED TO MODIFY EXISTING TESTS RELATED TO UPLOAD AND DOWNLOAD
 
 ## 12. Files Not Allowed to Modify
 
-All other files that are not mentioned above are strictly off limits. If necessary to modify other files, ask for permission.
+All files not explicitly listed in sections 10 and 11 are strictly off limits, except for the test files permitted in section 16.
+
+If the agent determines that additional files must be created or modified, it must explain the reason and request permission before proceeding.
+
+Existing authentication, authorization, messaging, and file upload functionality must not be changed unnecessarily.
 
 ## 13. Dependencies
 
@@ -372,114 +378,91 @@ Reuse existing implementations and conventions wherever possible.
 
 ## 14. Expected Behavior / User Flow
 
-User logs in and presses on the chat feature.
+The user logs in and navigates to the existing chat through the message tab.
 
-The user now has a button next to the Send button that allows file uploading.
+The user can see previously sent messages containing file attachments.
 
-The user presses it and a window appears informing them of the limits: allowed file formats, maximum 1 MiB per file, and maximum 3 files.
+The attachment filenames are displayed as blue, clickable links.
 
-The user can then click on a link or button that opens the operating system's file picker.
+When the user clicks an attachment, the frontend sends a download request to the backend containing the file ID and the existing JWT authentication.
 
-The user chooses up to 3 files at the same time and presses Open.
+The backend verifies that the authenticated user has permission to download the requested file.
 
-The selected filenames are now displayed in the chat input area.
+If authorized, the backend retrieves the physical file from storage and returns it as a downloadable response.
 
-The user may remove selected files before sending.
+The browser starts downloading the file using its original filename.
 
-When the user presses Send, the frontend uploads all selected files together in one request.
+If the user does not have permission to download the file, the request is rejected and an appropriate error message is displayed.
 
-The backend validates each file and the number of files.
+The same behavior applies to the admin, who can download attachments from all customer conversations they are authorized to access.
 
-If all files pass validation, the backend saves them to the filesystem and persists their metadata in PostgreSQL.
-
-The frontend then sends the chat message together with the returned attachment IDs.
-
-The backend associates the files with the correct message.
-
-The user and admin will now see the filenames attached to the message in the chat.
-
-The filenames must not be clickable, viewable, or downloadable.
-
-If any file fails validation or uploading, the message must not be sent with incomplete attachments. An error message must be displayed.
-
-The same behavior applies to the admin.
-
-Text-only messages must continue working without file attachments.
+Existing file uploads and text-only messages must continue working as before.
 
 ## 15. Acceptance Criteria
 
 The following criteria must be satisfied before the ticket can be accepted.
 
-### AC-01 — File Upload
+### AC-01 — File Download
 
-- [ ] Authenticated users with `Role.USER` can upload files through their existing chat interface.
-- [ ] Authenticated users with `Role.ADMIN` can upload files through their existing chat interface.
-- [ ] The upload functionality is accessible through a button next to the existing Send button.
-- [ ] Clicking the upload button opens a dialog displaying the supported file formats, maximum file size, and maximum number of attachments.
-- [ ] The user can select up to 3 files simultaneously using the operating system's file picker.
-- [ ] All selected files are sent together in one multipart request.
-- [ ] Successfully uploaded files are stored in the configured filesystem directory.
-- [ ] Uploaded file metadata is persisted in PostgreSQL.
-- [ ] Every uploaded file is associated with the authenticated user.
+- [ ] Authenticated users with `Role.USER` can download attachments from their own chat conversations.
+- [ ] Authenticated users with `Role.ADMIN` can download attachments from customer conversations they are authorized to access.
+- [ ] Clicking an attachment filename starts a download.
+- [ ] The downloaded file preserves its original filename.
+- [ ] The downloaded file contains the same content as the originally uploaded file.
+- [ ] PDF, PNG, JPG, and JPEG attachments can be downloaded.
+- [ ] Files are downloaded rather than opened for preview in the browser.
 
-### AC-02 — File Restrictions
+### AC-02 — File Retrieval
 
-- [ ] The system accepts `.pdf`, `.png`, `.jpg`, and `.jpeg` files.
-- [ ] Each file must not exceed 1 MiB (1,048,576 bytes).
-- [ ] A maximum of three files can be uploaded in one request and attached to a single chat message.
-- [ ] A request containing four or more files is rejected.
-- [ ] Empty files are rejected.
-- [ ] Unsupported file formats are rejected.
-- [ ] Files with misleading extensions or invalid content are rejected.
-- [ ] File size, format, and attachment-count restrictions are enforced by the backend, not only the frontend.
-- [ ] If any file in the request is invalid, the entire upload is rejected.
-- [ ] Invalid uploads display an understandable error message.
+- [ ] The backend retrieves file metadata using the requested file ID.
+- [ ] The existing `FileDAO` is used for database operations.
+- [ ] The existing `LocalFileStorage` component retrieves the physical file using its `storageKey`.
+- [ ] The correct physical file is returned to the requester.
+- [ ] The response uses the original filename stored in PostgreSQL.
+- [ ] The response includes the appropriate `Content-Type`, `Content-Disposition`, and `Content-Length` headers.
+- [ ] Internal storage keys and physical paths are not exposed to the frontend.
 
 ### AC-03 — Chat Integration
 
-- [ ] Selected files are displayed by filename in the chat interface.
-- [ ] Successfully sent messages display their associated attachment filenames.
-- [ ] Attachments are visible to both the sender and recipient in the correct conversation.
-- [ ] Attachments are not clickable, downloadable, or previewable.
-- [ ] Text-only messages continue functioning as before.
-- [ ] Uploading multiple files does not create duplicate chat messages.
-- [ ] Files cannot be associated with messages belonging to another user or conversation.
+- [ ] Attachment filenames are displayed as blue, clickable links in the existing chat.
+- [ ] Clicking an attachment initiates a download request.
+- [ ] Both customers and administrators can download attachments from authorized conversations.
+- [ ] Previously uploaded attachments can be downloaded.
+- [ ] Multiple attachments belonging to the same message can be downloaded individually.
+- [ ] Existing text-only messages continue working.
+- [ ] Existing file upload functionality remains unaffected.
 
 ### AC-04 — Storage and Database
 
-- [ ] The storage directory is configured using the `UPLOAD_DIR` environment variable.
-- [ ] The storage directory is created at startup if it does not exist.
-- [ ] The application fails startup with a clear error if the storage directory cannot be accessed or written to.
-- [ ] Every uploaded file receives a unique UUID-based storage filename.
-- [ ] The original filename is preserved in PostgreSQL.
-- [ ] Existing files are never overwritten.
-- [ ] Uploaded files are associated with the correct `User` entity.
-- [ ] Files attached to messages are associated with the correct `Message` entity.
-- [ ] Failed uploads do not leave invalid database records or orphaned physical files.
-- [ ] Internal storage paths and storage keys are never exposed to the frontend.
+- [ ] The existing `UploadedFile` entity and its relationships with `User` and `Message` are reused.
+- [ ] The existing `UPLOAD_DIR` configuration is reused.
+- [ ] Downloading a file does not modify or delete the physical file.
+- [ ] Downloading a file does not modify its database metadata.
+- [ ] Missing or inaccessible physical files are handled appropriately.
+- [ ] No new database tables or entities are introduced unless explicitly approved.
 
 ### AC-05 — Security
 
-- [ ] Unauthenticated requests cannot upload files.
-- [ ] Only `Role.USER` and `Role.ADMIN` can access the upload endpoint.
+- [ ] Unauthenticated requests cannot download files.
+- [ ] Only authenticated users with `Role.USER` or `Role.ADMIN` can access the download endpoint.
 - [ ] The authenticated user is identified through the existing JWT authentication context.
-- [ ] Users cannot specify or manipulate the uploader ID.
-- [ ] Users cannot attach another user's uploaded files to their messages.
-- [ ] Files are stored outside publicly accessible frontend directories.
+- [ ] The backend verifies authorization before returning file content.
+- [ ] Customers cannot download attachments from other customers' conversations.
+- [ ] Administrators can only download attachments from conversations they are authorized to access.
+- [ ] Files not associated with a chat message cannot be downloaded.
+- [ ] Manipulating a file ID does not bypass authorization.
 - [ ] Path traversal attempts are prevented.
-- [ ] Upload request sizes are limited to prevent excessive resource consumption.
-- [ ] Validation and storage errors are handled through the existing error-handling architecture.
+- [ ] Internal storage information is never exposed to the frontend.
 
 ### AC-06 — Frontend
 
-- [ ] The new upload functionality follows the existing frontend styling and component conventions.
-- [ ] The upload button is available in both customer and administrator chat interfaces.
-- [ ] Users are informed of supported file formats, the 1 MiB per-file size limit, and the three-file limit.
-- [ ] Users can select up to 3 files in one file-selection operation.
-- [ ] Selected filenames are displayed before sending.
-- [ ] Users can remove selected files before sending the message.
-- [ ] The frontend displays an upload loading state.
-- [ ] Failed uploads display an error without incorrectly indicating success.
+- [ ] Attachment filenames are styled as blue, clickable links.
+- [ ] The download functionality is available in both customer and administrator chat interfaces.
+- [ ] Clicking an attachment triggers an authenticated request to the backend.
+- [ ] The browser downloads the file using its original filename.
+- [ ] A loading state is displayed while the download is being prepared.
+- [ ] Failed downloads display an understandable error message.
+- [ ] Existing frontend styling and component conventions are followed.
 - [ ] Existing chat functionality and layout remain unaffected.
 
 ---
@@ -488,146 +471,113 @@ The following criteria must be satisfied before the ticket can be accepted.
 
 All tests must follow the existing project's testing frameworks, conventions, and architecture.
 
-The agent must inspect existing test implementations before creating new tests.
+The agent must inspect existing test implementations before creating or modifying tests.
+
+Existing FILE-01 tests should be extended where appropriate rather than duplicated.
 
 Tests must not depend on the developer's real upload directory or production data.
 
 ### 16.1 FileDAOTest.java
 
-Verify database persistence and retrieval of uploaded file metadata.
+Verify that the existing DAO can retrieve the metadata required for downloading files.
 
 Required tests:
 
-- [ ] Successfully persist an `UploadedFile` entity.
 - [ ] Retrieve an uploaded file by its UUID.
-- [ ] Verify the uploaded file is associated with the correct user.
-- [ ] Verify the uploaded file can be associated with a message.
-- [ ] Verify that multiple files can belong to the same user.
-- [ ] Verify that multiple files can belong to the same message.
-- [ ] Verify that duplicate storage keys are rejected.
-- [ ] Verify that required database fields cannot be null.
+- [ ] Retrieve the correct `storageKey` and `originalName`.
+- [ ] Verify that the file is associated with the correct user.
+- [ ] Verify that the file is associated with the correct message.
+- [ ] Handle a file ID that does not exist.
+- [ ] Verify that retrieving file metadata does not modify database records.
 
 ### 16.2 LocalFileStorageTest.java
 
-Verify physical file storage operations using a temporary test directory.
+Verify physical file retrieval using a temporary test directory.
 
 Required tests:
 
-- [ ] Create the upload directory when it does not exist.
-- [ ] Save a valid file successfully.
-- [ ] Verify the file exists at the expected storage location.
-- [ ] Generate unique storage filenames.
-- [ ] Prevent existing files from being overwritten.
-- [ ] Handle invalid or inaccessible storage paths.
-- [ ] Handle filesystem write failures.
-- [ ] Clean up temporary files after failed operations.
-- [ ] Verify that path traversal cannot access files outside the configured directory.
-- [ ] Verify cleanup of files after a failed multi-file upload.
+- [ ] Successfully retrieve an existing physical file.
+- [ ] Verify that the retrieved file contains the expected content.
+- [ ] Retrieve the correct file using its storage key.
+- [ ] Handle a file that does not exist.
+- [ ] Handle a file that cannot be accessed or read.
+- [ ] Prevent path traversal outside the configured storage directory.
+- [ ] Verify that downloading does not modify or delete the stored file.
 
-### 16.3 FileValidatorTest.java
+### 16.3 FileServiceTest.java
 
-Verify file validation independently of the controller and database.
+Verify business logic, authorization, and coordination between database retrieval and filesystem access.
 
 Required tests:
 
-- [ ] Accept a valid PDF file.
-- [ ] Accept a valid PNG file.
-- [ ] Accept a valid JPG/JPEG file.
-- [ ] Reject unsupported file formats.
-- [ ] Reject empty files.
-- [ ] Accept a file exactly 1,048,576 bytes in size.
-- [ ] Reject a file larger than 1,048,576 bytes.
-- [ ] Reject a file whose extension does not match its actual content.
-- [ ] Reject malformed files.
-- [ ] Verify that client-provided MIME types are not trusted.
-- [ ] Verify that the validation process does not allow unbounded memory consumption.
-- [ ] Accept a request containing 1, 2, or 3 valid files.
-- [ ] Reject a request containing more than 3 files.
-- [ ] Reject an entire request when one of the selected files is invalid.
+- [ ] Successfully retrieve a file belonging to the authenticated customer's conversation.
+- [ ] Successfully retrieve an attachment sent by the admin to that customer.
+- [ ] Allow an authorized administrator to retrieve attachments from customer conversations.
+- [ ] Reject a customer attempting to download another customer's attachment.
+- [ ] Reject an administrator attempting to access a conversation they are not authorized to access.
+- [ ] Reject attempts to download files that are not associated with a message.
+- [ ] Handle invalid or nonexistent file IDs.
+- [ ] Verify that authorization occurs before accessing the physical file.
+- [ ] Handle filesystem retrieval failures.
+- [ ] Verify that the original filename and content type are preserved.
 
-### 16.4 FileServiceTest.java
+### 16.4 FileControllerTest.java
 
-Verify business logic and coordination between validation, filesystem storage, and database persistence.
+Verify the download endpoint and HTTP responses.
 
 Required tests:
 
-- [ ] Successfully upload one valid file.
-- [ ] Successfully upload three valid files in one operation.
-- [ ] Associate all uploaded files with the authenticated user.
-- [ ] Generate and persist the correct metadata for each file.
-- [ ] Verify that the original filenames are preserved.
-- [ ] Reject invalid files before permanent storage.
-- [ ] Reject attempts to associate another user's file with a message.
-- [ ] Enforce a maximum of three attachments per message.
-- [ ] Reject duplicate attachment IDs within the same message.
-- [ ] Handle filesystem failures without persisting invalid metadata.
-- [ ] Remove all newly stored files when database persistence fails.
-- [ ] Ensure failed uploads do not leave temporary files behind.
-- [ ] Verify that a failed multi-file upload does not leave partially successful results.
-
-### 16.5 FileControllerTest.java
-
-Verify the upload endpoint and HTTP responses.
-
-Required tests:
-
-- [ ] `POST /api/files` accepts one valid multipart file.
-- [ ] `POST /api/files` accepts three valid multipart files in one request.
-- [ ] A successful upload returns `201 Created`.
-- [ ] The response contains an array of uploaded file metadata.
-- [ ] The response does not expose internal storage keys or filesystem paths.
+- [ ] `GET /api/files/{fileId}` successfully downloads an authorized file.
+- [ ] A successful download returns `200 OK`.
+- [ ] The response contains the correct binary file content.
+- [ ] The response contains the correct `Content-Type`.
+- [ ] The response contains `Content-Disposition: attachment` with the original filename.
+- [ ] The response contains the correct `Content-Length`.
 - [ ] Requests without authentication return `401 Unauthorized`.
 - [ ] Requests without the required role are rejected.
-- [ ] Requests without files return `400 Bad Request`.
-- [ ] Requests containing four files return `400 Bad Request`.
-- [ ] Empty files return `400 Bad Request`.
-- [ ] Oversized files return `413 Content Too Large`.
-- [ ] Unsupported formats return `415 Unsupported Media Type`.
-- [ ] Malformed multipart requests are handled correctly.
-- [ ] A request containing two valid files and one invalid file is rejected completely.
-- [ ] Unexpected storage or database failures return an appropriate server error without exposing internal implementation details.
+- [ ] Malformed file IDs return `400 Bad Request`.
+- [ ] Unauthorized file access returns the error status defined in the API contract.
+- [ ] Nonexistent files return `404 Not Found`.
+- [ ] Files without an associated message cannot be downloaded.
+- [ ] Unexpected filesystem or database failures return an appropriate error without exposing internal implementation details.
 
-### 16.6 Chat Integration Tests
+### 16.5 Chat Integration Tests
 
-Verify that uploads integrate correctly with the existing messaging functionality.
+Verify that downloads integrate correctly with the existing messaging functionality.
 
 Required tests:
 
-- [ ] A customer can send a chat message containing one attachment.
-- [ ] A customer can send a chat message containing three attachments uploaded in one request.
-- [ ] An administrator can send a chat message containing attachments.
-- [ ] Both participants can see the filenames of attachments in their conversation.
-- [ ] A message with four attachments is rejected.
-- [ ] An unauthorized attachment ID is rejected.
-- [ ] A failed attachment operation does not result in a successfully sent message with missing attachments.
+- [ ] A customer can download an attachment they previously uploaded to their conversation.
+- [ ] A customer can download an attachment sent by the admin.
+- [ ] An administrator can download an attachment sent by a customer.
+- [ ] An administrator can download an attachment they sent in an authorized customer conversation.
+- [ ] Multiple attachments in one message can be downloaded individually.
+- [ ] Attachments cannot be downloaded from unauthorized conversations.
+- [ ] Previously uploaded attachments remain accessible after reopening the chat.
 - [ ] Existing text-only messages continue working.
-- [ ] Attachments are not exposed in other customers' conversations.
-- [ ] A multi-file upload results in one chat message, not multiple messages.
+- [ ] Existing file upload functionality continues working.
 
-### 16.7 Frontend Tests
+### 16.6 Frontend Tests
 
-Verify the upload interface in both customer and administrator chat views.
+Verify the download functionality in both customer and administrator chat interfaces.
 
 Required tests:
 
-- [ ] The upload button is displayed next to the Send button.
-- [ ] Clicking the button opens the upload dialog.
-- [ ] The dialog displays supported formats and upload limits.
-- [ ] The operating system's file picker can be opened.
-- [ ] The user can select up to 3 files simultaneously.
-- [ ] Selected filenames are displayed.
-- [ ] Users can remove selected files before sending.
-- [ ] The frontend rejects selections exceeding three attachments.
-- [ ] The frontend displays errors for oversized and unsupported files.
-- [ ] All selected files are submitted together in one request.
-- [ ] Successful uploads display the correct filenames in the chat.
-- [ ] Attachments cannot be clicked, downloaded, or previewed.
-- [ ] Existing message sending functionality continues working.
+- [ ] Attachment filenames are displayed as blue, clickable links.
+- [ ] Clicking an attachment sends a request containing the correct file ID.
+- [ ] The request includes the existing JWT authentication.
+- [ ] A successful response triggers a browser download.
+- [ ] The downloaded file uses its original filename.
+- [ ] PDF and image attachments download instead of opening for preview.
+- [ ] A loading state is displayed while preparing the download.
+- [ ] Failed downloads display an understandable error message.
+- [ ] Clicking an attachment does not accidentally send a chat message.
+- [ ] Existing upload and messaging functionality continues working.
 
-### 16.8 Test Isolation
+### 16.7 Test Isolation
 
 - [ ] Filesystem tests use temporary directories.
-- [ ] Tests do not modify or delete real user-uploaded files.
+- [ ] Tests do not modify or delete real uploaded files.
 - [ ] Database tests use the existing test database configuration.
 - [ ] Tests clean up their created data and temporary files.
 - [ ] Tests can be executed repeatedly without depending on previous test runs.
@@ -636,40 +586,40 @@ Required tests:
 
 ## 17. Definition of Done
 
-FILE-01 is considered complete when all the following conditions are satisfied.
+FILE-02 is considered complete when all the following conditions are satisfied.
 
 ### Implementation
 
-- [ ] All functional requirements within the ticket's scope are implemented.
-- [ ] Customers and administrators can upload files through their existing chat interfaces.
-- [ ] Up to three files can be uploaded simultaneously in one multipart request.
-- [ ] A maximum of three files per message is enforced.
-- [ ] The 1 MiB per-file size limit is enforced.
-- [ ] Only supported file formats are accepted.
-- [ ] Uploaded files are stored successfully on the local filesystem.
-- [ ] File metadata is persisted correctly in PostgreSQL.
-- [ ] Files are associated with the correct user and chat message.
-- [ ] Attachment filenames are visible in the chat without download or preview functionality.
+- [ ] Customers and administrators can download attachments through their existing chat interfaces.
+- [ ] Clicking an attachment filename starts the download.
+- [ ] Downloaded files preserve their original filenames and contents.
+- [ ] PDF, PNG, JPG, and JPEG attachments can be downloaded.
+- [ ] The backend retrieves the correct physical file using its internal storage key.
+- [ ] Only authorized users can download attachments.
+- [ ] Existing upload functionality and text-only messaging remain functional.
 
 ### Architecture and Code Quality
 
 - [ ] The implementation follows `AGENTS.md`, `ARCHITECTURE.md`, and `CODESTANDARD.md`.
 - [ ] The existing controller → service → DAO architecture is respected.
 - [ ] Database operations are handled through the DAO.
-- [ ] Business logic is implemented in the service layer.
-- [ ] Filesystem operations are separated into a dedicated storage component.
+- [ ] Download authorization and business logic are handled through `FileService`.
+- [ ] Filesystem operations are handled through `LocalFileStorage`.
+- [ ] Existing FILE-01 functionality is reused wherever possible.
 - [ ] No unnecessary dependencies, refactoring, or unrelated functionality have been introduced.
 - [ ] Only files explicitly permitted by the ticket have been created or modified.
 - [ ] Existing project naming conventions and coding patterns have been followed.
 
 ### Security
 
-- [ ] Authentication and authorization are enforced.
-- [ ] Backend validation covers file size, file type, content, and attachment count.
-- [ ] The entire upload is rejected if any selected file fails validation.
-- [ ] Storage paths and filenames are handled securely.
-- [ ] Internal storage information is not exposed to clients.
-- [ ] Failed uploads are handled safely and do not leave inconsistent data.
+- [ ] JWT authentication and role-based access are enforced.
+- [ ] File-specific authorization is verified before returning file content.
+- [ ] Customers cannot download attachments belonging to other customers' conversations.
+- [ ] Administrators can only download attachments from authorized conversations.
+- [ ] Unattached files cannot be downloaded.
+- [ ] Invalid or manipulated file IDs cannot bypass authorization.
+- [ ] Internal storage paths and storage keys are never exposed.
+- [ ] Unauthorized requests are rejected without returning file content.
 
 ### Testing and Verification
 
@@ -677,9 +627,10 @@ FILE-01 is considered complete when all the following conditions are satisfied.
 - [ ] All relevant integration tests pass.
 - [ ] Backend builds successfully.
 - [ ] Frontend builds successfully.
-- [ ] Existing tests continue passing.
-- [ ] The feature has been manually verified in both customer and administrator chat interfaces.
-- [ ] Existing text-only messaging remains functional.
+- [ ] Existing FILE-01 tests continue passing.
+- [ ] The download functionality has been manually verified in both customer and administrator chat interfaces.
+- [ ] Previously uploaded files can be downloaded successfully.
+- [ ] Existing file uploads and text-only messages remain functional.
 - [ ] No new linting or compilation errors have been introduced.
 
 ### Final Delivery

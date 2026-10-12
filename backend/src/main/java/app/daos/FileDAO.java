@@ -51,6 +51,25 @@ public class FileDAO extends EntityManagerDAO<UploadedFile> {
 
     //--------------------------------------------------------------
 
+    public UploadedFile findForDownload(UUID id) {
+        return executeQuery(() -> em.createQuery("""
+                select f from UploadedFile f
+                join fetch f.uploadedBy
+                left join fetch f.message m
+                left join fetch m.sender
+                left join fetch m.recipient
+                where f.id = :id
+                """, UploadedFile.class).setParameter("id", id).getResultList().stream().findFirst().orElse(null));
+    }
+
+    //--------------------------------------------------------------
+
+    public List<User> getAdmins() {
+        return new MessageDAO(em).getAdmins();
+    }
+
+    //--------------------------------------------------------------
+
     public List<UploadedFile> createAll(List<UploadedFile> files) {
         return executeQuery(() -> {
             files.forEach(em::persist);

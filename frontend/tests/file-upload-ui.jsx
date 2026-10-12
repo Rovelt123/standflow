@@ -1,4 +1,4 @@
-/* global window, document, Event, HTMLInputElement, sessionStorage, localStorage, btoa, URL, File, FormData */
+/* global window, document, Event, HTMLInputElement, HTMLAnchorElement, sessionStorage, localStorage, btoa, URL, File, FormData, Blob */
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MemoryRouter } from 'react-router-dom'
@@ -21,6 +21,25 @@ let messages = []
 let mode = 'success'
 let resolveUpload
 let adminView = false
+let resolveDownload
+let completedDownloads = []
+const downloadBlobs = new Map()
+const createObjectURL = URL.createObjectURL.bind(URL)
+const revokeObjectURL = URL.revokeObjectURL.bind(URL)
+const anchorClick = HTMLAnchorElement.prototype.click
+URL.createObjectURL = blob => {
+  const url = createObjectURL(blob)
+  downloadBlobs.set(url, blob)
+  return url
+}
+URL.revokeObjectURL = url => { downloadBlobs.delete(url); revokeObjectURL(url) }
+HTMLAnchorElement.prototype.click = function () {
+  if (this.download) {
+    completedDownloads.push({ name: this.download, url: this.href, blob: downloadBlobs.get(this.href), target: this.target })
+    const requested = new URL(window.location.href).searchParams.get('nativeDownload')
+    if (requested === '1' || requested === `${adminView ? 'admin' : 'customer'}:${this.download}`) anchorClick.call(this)
+  } else anchorClick.call(this)
+}
 
 //--------------------------------------------------------------
 
@@ -36,6 +55,12 @@ globalThis.fetch = async (url, options = {}) => {
   const call = { path, method: options.method || 'GET', headers: options.headers,
     body: multipart ? options.body.getAll('files') : options.body ? JSON.parse(options.body) : undefined }
   calls.push(call)
+  if (path.startsWith('/api/files/') && call.method === 'GET') {
+    if (mode === 'download-failure') return response('Filen findes ikke.', 404)
+    const binary = { status: 200, blob: async () => new Blob(['valid fixture'], { type: 'application/pdf' }) }
+    if (mode === 'download-deferred') return new Promise(resolve => { resolveDownload = () => resolve(binary) })
+    return binary
+  }
   if (path === '/api/messages/threads') return response([
     { customerId, customerName: 'Alice', company: 'Test Company', subject: 'Documents', lastMessage: '', lastMessageAt: '2026-10-12T10:00:00' },
     { customerId: otherId, customerName: 'Bob', company: 'Other Company', subject: 'Other', lastMessage: '', lastMessageAt: '2026-10-12T10:00:00' },
@@ -115,6 +140,7 @@ async function verify(admin) {
   await act(async () => root.render(null))
   calls = []
   messages = []
+  completedDownloads = []
   mode = 'success'
   localStorage.removeItem('standflow.auth.token')
   sessionStorage.setItem('standflow.auth.token', token)
@@ -167,9 +193,37 @@ async function verify(admin) {
   check(uploadCalls().length === 2 && messages.length === 1 && selectedNames().length === 0,
     `${label}: controlled retry reuses upload IDs and creates one message`)
   const sent = document.querySelector('[aria-label="Vedhæftede filer"]')
-  check(sent?.querySelectorAll('li').length === 3 && !sent.querySelector('a,button,img,iframe'), `${label}: attachment names are plain text`)
+  check(sent?.querySelectorAll('li button').length === 3 && !sent.querySelector('img,iframe'), `${label}: attachment names are download controls without previews`)
   check(document.querySelectorAll('[aria-label="Vedhæftede filer"]').length === 1, `${label}: only one attachment message is rendered`)
   check(uploadCalls().every(call => call.body.length === 3 && !call.headers['Content-Type']), `${label}: three files use one browser multipart request`)
+  const links = [...sent.querySelectorAll('button')]
+  check(links.every(link => window.getComputedStyle(link).color === 'rgb(37, 99, 235)'
+    && window.getComputedStyle(link).textDecorationLine.includes('underline')), `${label}: full filenames are blue underlined controls`)
+  const messagesBeforeDownload = messageCalls().length
+  mode = 'download-failure'
+  await click(links[0])
+  check(sent.querySelector('[role="alert"]').textContent.includes('ikke tilgængelig') && completedDownloads.length === 0,
+    `${label}: failed download displays an error and starts no download`)
+  mode = 'download-deferred'
+  await click(links[0])
+  check(links[0].disabled && links[0].getAttribute('aria-busy') === 'true'
+    && sent.querySelector('[role="status"]').textContent.includes('Forbereder'), `${label}: download preparation has a loading state`)
+  const requestsBeforeRepeat = calls.filter(call => call.path.startsWith('/api/files/')).length
+  await click(links[0])
+  check(calls.filter(call => call.path.startsWith('/api/files/')).length === requestsBeforeRepeat, `${label}: pending download rejects repeated clicks`)
+  mode = 'success'
+  await act(async () => resolveDownload())
+  await click(links[1])
+  await click(links[2])
+  check(completedDownloads.map(download => download.name).join(',') === 'a.pdf,b.png,c.jpeg'
+    && completedDownloads.every(download => download.url.startsWith('blob:') && !download.target),
+    `${label}: each attachment starts its own download using the original filename`)
+  check((await Promise.all(completedDownloads.map(download => download.blob.text()))).every(content => content === 'valid fixture'),
+    `${label}: browser download receives the original content`)
+  const downloadRequests = calls.filter(call => call.path.startsWith('/api/files/'))
+  check(downloadRequests.every(call => call.headers.Authorization === `Bearer ${token}` && call.body === undefined)
+    && downloadRequests.at(-1).path.endsWith('/file-2'), `${label}: download requests include the file ID and JWT`)
+  check(messageCalls().length === messagesBeforeDownload && messages.length === 1, `${label}: clicking attachments never sends chat messages`)
   await input(document.querySelector('[placeholder="Indtast besked"]'), 'Text only')
   await submit()
   check(messages.length === 2 && uploadCalls().length === 2 && !messageCalls().at(-1).body.attachmentIds,

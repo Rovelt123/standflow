@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import AdminTopBar from '../../components/admin/AdminTopBar.jsx'
 import AdminSidebar from '../../components/admin/AdminSidebar.jsx'
-import { portalRequest, uploadFiles } from '../portal/portalApi.js'
+import { portalRequest, uploadFiles, downloadFile } from '../portal/portalApi.js'
 import FileUpload from '../portal/FileUpload.jsx'
 import shell from './KontrolpanelPage.module.css'
 import styles from './MessagesPage.module.css'
@@ -22,6 +22,24 @@ export default function MessagesPage() {
   const [files, setFiles] = useState([])
   const [attachmentIds, setAttachmentIds] = useState([])
   const [uploading, setUploading] = useState(false)
+  const [downloads, setDownloads] = useState({})
+  const downloadsInFlight = useRef(new Set())
+
+  //--------------------------------------------------------------
+
+  async function handleDownload(file) {
+    if (downloadsInFlight.current.has(file.id)) return
+    downloadsInFlight.current.add(file.id)
+    setDownloads(current => ({ ...current, [file.id]: { loading: true, error: '' } }))
+    try {
+      await downloadFile(file.id, file.originalName)
+    } catch (error) {
+      setDownloads(current => ({ ...current, [file.id]: { loading: true, error: error.message } }))
+    } finally {
+      downloadsInFlight.current.delete(file.id)
+      setDownloads(current => ({ ...current, [file.id]: { ...current[file.id], loading: false } }))
+    }
+  }
 
   const selected = threads.find(thread => thread.customerId === selectedId)
 
@@ -230,7 +248,15 @@ export default function MessagesPage() {
                         <p>{message.body}</p>
                         {message.attachments?.length > 0 && (
                           <ul className={styles.attachments} aria-label="Vedhæftede filer">
-                            {message.attachments.map(file => <li key={file.id}>{file.originalName}</li>)}
+                            {message.attachments.map(file => (
+                              <li key={file.id}>
+                                <button type="button" className={styles.attachmentLink}
+                                  disabled={downloads[file.id]?.loading} aria-busy={downloads[file.id]?.loading || undefined}
+                                  onClick={() => handleDownload(file)}>{file.originalName}</button>
+                                {downloads[file.id]?.loading && <span role="status"> Forbereder download…</span>}
+                                {downloads[file.id]?.error && <span className={styles.downloadError} role="alert"> {downloads[file.id].error}</span>}
+                              </li>
+                            ))}
                           </ul>
                         )}
                       </div>

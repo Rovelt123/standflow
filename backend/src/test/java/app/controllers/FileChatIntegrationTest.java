@@ -53,7 +53,10 @@ class FileChatIntegrationTest extends MessageTestSupport {
         files = new FileService(new FileDAO(em), storage, new FileValidator(), clock);
         server = Javalin.create(config -> {
             config.showJavalinBanner = false;
-            config.router.apiBuilder(() -> path("/api", MessageController.registerRoutes(service)));
+            config.router.apiBuilder(() -> path("/api", () -> {
+                MessageController.registerRoutes(service).addEndpoints();
+                FileController.registerRoutes(files).addEndpoints();
+            }));
         }).beforeMatched(ctx -> {
             String header = ctx.header("Test-User");
             if (header == null) throw new UnauthorizedResponse("Login required");
@@ -195,5 +198,42 @@ class FileChatIntegrationTest extends MessageTestSupport {
             assertEquals(400, request("POST", "/messages", alice, invalid).statusCode());
         }
         assertEquals(2, countMessages());
+    }
+
+    //--------------------------------------------------------------
+
+    private HttpResponse<byte[]> download(String id, User requester) throws Exception {
+        var request = HttpRequest.newBuilder(URI.create("http://localhost:" + server.port() + "/api/files/" + id))
+                .header("Test-User", requester.getId().toString()).GET().build();
+        return client.send(request, HttpResponse.BodyHandlers.ofByteArray());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void sentAttachmentsDownloadIndividuallyAfterReopeningBothDirections() throws Exception {
+        List<String> customerFiles = uploads(alice, 3);
+        assertEquals(201, request("POST", "/messages", alice,
+                Map.of("subject", "Documents", "body", "Attached", "attachmentIds", customerFiles)).statusCode());
+        List<String> adminFiles = uploads(admin, 3);
+        assertEquals(201, request("POST", "/messages/threads/" + alice.getId(), admin,
+                Map.of("body", "Reply", "attachmentIds", adminFiles)).statusCode());
+        var reopened = json.readTree(request("GET", "/messages/mine", alice, null).body());
+        assertEquals(2, reopened.size());
+        assertEquals(reopened, json.readTree(request("GET", "/messages/threads/" + alice.getId(), admin, null).body()));
+        byte[] expected = image("png");
+        for (String id : java.util.stream.Stream.concat(customerFiles.stream(), adminFiles.stream()).toList()) {
+            for (User participant : List.of(alice, admin)) {
+                var response = download(id, participant);
+                assertEquals(200, response.statusCode());
+                assertArrayEquals(expected, response.body());
+                assertTrue(response.headers().firstValue("Content-Disposition").orElseThrow().startsWith("attachment;"));
+            }
+            assertEquals(404, download(id, bob).statusCode());
+            assertTrue(storage.exists(new FileDAO(em).getById(UUID.fromString(id)).getStorageKey()));
+        }
+        assertEquals(2, countMessages());
+        assertEquals(6, new FileDAO(em).getAll().size());
+        assertEquals(201, request("POST", "/messages", alice, Map.of("subject", "Text", "body", "Still works")).statusCode());
     }
 }

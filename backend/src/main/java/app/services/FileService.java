@@ -11,6 +11,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.NoSuchFileException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -33,6 +35,13 @@ public class FileService implements AutoCloseable {
     private final Clock clock;
     private ScheduledExecutorService cleanup;
 
+    public record Download(FileDTO metadata, InputStream content) implements AutoCloseable {
+        @Override
+        public void close() throws IOException {
+            content.close();
+        }
+    }
+
     //--------------------------------------------------------------
 
     public FileService(FileDAO dao, LocalFileStorage storage, FileValidator validator, Clock clock) {
@@ -40,6 +49,67 @@ public class FileService implements AutoCloseable {
         this.storage = Objects.requireNonNull(storage);
         this.validator = Objects.requireNonNull(validator);
         this.clock = Objects.requireNonNull(clock);
+    }
+
+    //--------------------------------------------------------------
+
+    public Download download(UUID requesterId, UUID fileId) {
+        if (requesterId == null) throw new ApiException(401, "Login er påkrævet.");
+        if (fileId == null) throw new ApiException(400, "Filens id er ugyldigt.");
+        try {
+            User requester = dao.getUser(requesterId);
+            if (requester == null || requester.getRoles().stream().noneMatch(role -> role == Role.USER || role == Role.ADMIN)) {
+                throw unavailable();
+            }
+            UploadedFile file = dao.findForDownload(fileId);
+            if (file == null || file.getMessage() == null) throw unavailable();
+            authorizeDownload(requester, file);
+            FileDTO metadata = FileDTO.from(file);
+            LocalFileStorage.StoredFile stored = storage.open(file.getStorageKey());
+            try {
+                if (stored.size() != file.getSize()) throw new IOException("Stored file length differs from its metadata.");
+                return new Download(metadata, stored.content());
+            } catch (IOException | RuntimeException exception) {
+                try {
+                    stored.close();
+                } catch (IOException closeFailure) {
+                    exception.addSuppressed(closeFailure);
+                }
+                throw exception;
+            }
+        } catch (NoSuchFileException exception) {
+            throw unavailable();
+        } catch (ApiException exception) {
+            if (exception.getStatus() < 500) throw exception;
+            LOGGER.error("Download authorization or metadata retrieval failed.", exception);
+            throw new ApiException(500, "Filen kunne ikke downloades. Prøv igen senere.");
+        } catch (IOException | RuntimeException exception) {
+            LOGGER.error("File download failed.", exception);
+            throw new ApiException(500, "Filen kunne ikke downloades. Prøv igen senere.");
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    private void authorizeDownload(User requester, UploadedFile file) {
+        List<User> admins = dao.getAdmins();
+        if (admins.size() != 1) throw new ApiException(500, "Chatten kræver præcis én admin.");
+        UUID adminId = admins.getFirst().getId();
+        User sender = file.getMessage().getSender();
+        User recipient = file.getMessage().getRecipient();
+        User customer;
+        if (sender.getId().equals(adminId)) customer = recipient;
+        else if (recipient.getId().equals(adminId)) customer = sender;
+        else throw unavailable();
+        if (!customer.getRoles().contains(Role.USER) || customer.getRoles().contains(Role.ADMIN)
+                || customer.getRoles().contains(Role.OWNER)) throw unavailable();
+        if (!requester.getId().equals(adminId) && !requester.getId().equals(customer.getId())) throw unavailable();
+    }
+
+    //--------------------------------------------------------------
+
+    private ApiException unavailable() {
+        return new ApiException(404, "Filen findes ikke eller er ikke tilgængelig.");
     }
 
     //--------------------------------------------------------------

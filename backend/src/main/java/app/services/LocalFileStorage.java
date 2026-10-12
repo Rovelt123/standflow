@@ -1,6 +1,10 @@
 package app.services;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.channels.Channels;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -9,6 +13,13 @@ import java.util.UUID;
 
 public class LocalFileStorage {
     private final Path directory;
+
+    public record StoredFile(InputStream content, long size) implements AutoCloseable {
+        @Override
+        public void close() throws IOException {
+            content.close();
+        }
+    }
 
     //--------------------------------------------------------------
 
@@ -73,6 +84,26 @@ public class LocalFileStorage {
 
     public boolean exists(String key) {
         return Files.isRegularFile(resolve(key), LinkOption.NOFOLLOW_LINKS);
+    }
+
+    //--------------------------------------------------------------
+
+    public StoredFile open(String key) throws IOException {
+        Path target = resolve(key);
+        if (!Files.readAttributes(target, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS).isRegularFile()) {
+            throw new NoSuchFileException("Stored content is unavailable.");
+        }
+        var channel = Files.newByteChannel(target, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS);
+        try {
+            return new StoredFile(Channels.newInputStream(channel), channel.size());
+        } catch (IOException | RuntimeException exception) {
+            try {
+                channel.close();
+            } catch (IOException closeFailure) {
+                exception.addSuppressed(closeFailure);
+            }
+            throw exception;
+        }
     }
 
     //--------------------------------------------------------------
