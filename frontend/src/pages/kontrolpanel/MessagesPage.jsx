@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import AdminTopBar from '../../components/admin/AdminTopBar.jsx'
 import AdminSidebar from '../../components/admin/AdminSidebar.jsx'
-import { portalRequest } from '../portal/portalApi.js'
+import { portalRequest, uploadFiles, downloadFile } from '../portal/portalApi.js'
+import FileUpload from '../portal/FileUpload.jsx'
 import shell from './KontrolpanelPage.module.css'
 import styles from './MessagesPage.module.css'
 
@@ -18,6 +19,27 @@ export default function MessagesPage() {
   const [listError, setListError] = useState('')
   const [chatError, setChatError] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
+  const [files, setFiles] = useState([])
+  const [attachmentIds, setAttachmentIds] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [downloads, setDownloads] = useState({})
+  const downloadsInFlight = useRef(new Set())
+
+  //--------------------------------------------------------------
+
+  async function handleDownload(file) {
+    if (downloadsInFlight.current.has(file.id)) return
+    downloadsInFlight.current.add(file.id)
+    setDownloads(current => ({ ...current, [file.id]: { loading: true, error: '' } }))
+    try {
+      await downloadFile(file.id, file.originalName)
+    } catch (error) {
+      setDownloads(current => ({ ...current, [file.id]: { loading: true, error: error.message } }))
+    } finally {
+      downloadsInFlight.current.delete(file.id)
+      setDownloads(current => ({ ...current, [file.id]: { ...current[file.id], loading: false } }))
+    }
+  }
 
   const selected = threads.find(thread => thread.customerId === selectedId)
 
@@ -82,12 +104,23 @@ export default function MessagesPage() {
     setChatError('')
 
     try {
-      await portalRequest(`/messages/threads/${selectedId}`, 'POST', { body })
+      let ids = attachmentIds
+      if (files.length && !ids.length) {
+        setUploading(true)
+        ids = (await uploadFiles(files)).map(file => file.id)
+        setAttachmentIds(ids)
+        setUploading(false)
+      }
+      await portalRequest(`/messages/threads/${selectedId}`, 'POST', { body,
+        ...(ids.length ? { attachmentIds: ids } : {}) })
       setBody('')
+      setFiles([])
+      setAttachmentIds([])
       setRefreshKey(current => current + 1)
     } catch (error) {
       setChatError(error.message)
     } finally {
+      setUploading(false)
       setSending(false)
     }
   }
@@ -155,6 +188,8 @@ export default function MessagesPage() {
                     onClick={() => {
                       if (selectedId !== thread.customerId) {
                         setBody('')
+                        setFiles([])
+                        setAttachmentIds([])
                         setSelectedId(thread.customerId)
                       }
                     }}
@@ -211,6 +246,19 @@ export default function MessagesPage() {
                       <div className={styles.bubble}>
                         <strong>{message.subject}</strong>
                         <p>{message.body}</p>
+                        {message.attachments?.length > 0 && (
+                          <ul className={styles.attachments} aria-label="Vedhæftede filer">
+                            {message.attachments.map(file => (
+                              <li key={file.id}>
+                                <button type="button" className={styles.attachmentLink}
+                                  disabled={downloads[file.id]?.loading} aria-busy={downloads[file.id]?.loading || undefined}
+                                  onClick={() => handleDownload(file)}>{file.originalName}</button>
+                                {downloads[file.id]?.loading && <span role="status"> Forbereder download…</span>}
+                                {downloads[file.id]?.error && <span className={styles.downloadError} role="alert"> {downloads[file.id].error}</span>}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
                     </article>
                   )
@@ -220,6 +268,7 @@ export default function MessagesPage() {
               {chatError && <p role="alert">{chatError}</p>}
 
               <form className={styles.composer} onSubmit={sendReply}>
+                {uploading && <p className={styles.uploadStatus} role="status">Uploader filer…</p>}
                 <input
                   aria-label="Svar til kunden"
                   placeholder="Indtast besked"
@@ -229,6 +278,8 @@ export default function MessagesPage() {
                   required
                   maxLength={5000}
                 />
+                <FileUpload files={files} disabled={!selectedId || opening || sending} onError={setChatError}
+                  onChange={selected => { setFiles(selected); setAttachmentIds([]) }} />
                 <button
                   type="submit"
                   aria-label="Send svar"
