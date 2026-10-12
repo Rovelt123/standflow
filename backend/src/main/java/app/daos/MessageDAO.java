@@ -3,11 +3,14 @@ package app.daos;
 import app.daos.generic.EntityManagerDAO;
 import app.entities.Message;
 import app.entities.User;
+import app.entities.UploadedFile;
 import app.enums.Role;
 import jakarta.persistence.EntityManager;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.function.Consumer;
 
 public class MessageDAO extends EntityManagerDAO<Message> {
     public MessageDAO(EntityManager em) {
@@ -18,6 +21,27 @@ public class MessageDAO extends EntityManagerDAO<Message> {
 
     public User getUser(UUID id) {
         return executeQuery(() -> em.find(User.class, id));
+    }
+
+    //--------------------------------------------------------------
+
+    public Message createWithAttachments(Message message, List<UUID> ids, Consumer<List<UploadedFile>> validate) {
+        FileDAO files = new FileDAO(em);
+        return files.inTransaction(() -> {
+            List<UploadedFile> attachments = new ArrayList<>();
+            // Consistent lock order prevents deadlocks between concurrent sends.
+            ids.stream().sorted().forEach(id -> attachments.add(files.lock(id)));
+            validate.accept(attachments);
+            em.persist(message);
+            attachments.forEach(file -> file.setMessage(message));
+            return message;
+        });
+    }
+
+    //--------------------------------------------------------------
+
+    public List<UploadedFile> getAttachments(UUID messageId) {
+        return new FileDAO(em).getForMessage(messageId);
     }
 
     //--------------------------------------------------------------

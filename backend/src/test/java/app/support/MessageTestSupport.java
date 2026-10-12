@@ -4,6 +4,7 @@ import app.daos.MessageDAO;
 import app.daos.UserDAO;
 import app.entities.Message;
 import app.entities.User;
+import app.entities.UploadedFile;
 import app.enums.Role;
 import app.services.ConversationService;
 import app.services.MessageEmailService;
@@ -40,6 +41,7 @@ public abstract class MessageTestSupport {
     @BeforeEach
     void openDatabase() {
         emf = new Configuration().addAnnotatedClass(User.class).addAnnotatedClass(Message.class)
+                .addAnnotatedClass(UploadedFile.class)
                 .setProperty("hibernate.connection.driver_class", "org.h2.Driver")
                 .setProperty("hibernate.connection.url", "jdbc:h2:mem:message_" + UUID.randomUUID())
                 .setProperty("hibernate.hbm2ddl.auto", "create-drop")

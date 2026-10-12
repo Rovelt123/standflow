@@ -53,11 +53,11 @@ public class ConversationService {
     public MessageDTO sendCustomer(UUID authenticatedId, Map<String, ?> request) {
         User customer = authenticatedCustomer(authenticatedId);
         User admin = chatAdmin();
-        validateFields(request, Set.of("subject", "body"));
+        validateFields(request, Set.of("subject", "body", "attachmentIds"));
         Message message = save(customer, admin, requiredText(request, "subject", 200),
-                requiredText(request, "body", 5000));
+                requiredText(request, "body", 5000), FileService.attachmentIds(request));
         notifyAfterSave(admin, message, true);
-        return mapper.toDTO(message);
+        return messageDTO(message);
     }
 
     //--------------------------------------------------------------
@@ -82,12 +82,12 @@ public class ConversationService {
         User admin = authenticatedAdmin(authenticatedId);
         User customer = customer(customerId);
         List<Message> conversation = messageDAO.getConversation(customer.getId(), admin.getId());
-        validateFields(request, conversation.isEmpty() ? Set.of("subject", "body") : Set.of("body"));
+        validateFields(request, conversation.isEmpty() ? Set.of("subject", "body", "attachmentIds") : Set.of("body", "attachmentIds"));
         String subject = conversation.isEmpty() ? requiredText(request, "subject", 200)
                 : conversation.getLast().getSubject();
-        Message message = save(admin, customer, subject, requiredText(request, "body", 5000));
+        Message message = save(admin, customer, subject, requiredText(request, "body", 5000), FileService.attachmentIds(request));
         notifyAfterSave(customer, message, false);
-        return mapper.toDTO(message);
+        return messageDTO(message);
     }
 
     //--------------------------------------------------------------
@@ -134,20 +134,31 @@ public class ConversationService {
     //--------------------------------------------------------------
 
     private List<MessageDTO> messages(UUID customerId, UUID adminId) {
-        return messageDAO.getConversation(customerId, adminId).stream().map(mapper::toDTO).toList();
+        return messageDAO.getConversation(customerId, adminId).stream().map(this::messageDTO).toList();
     }
 
     //--------------------------------------------------------------
 
-    private Message save(User sender, User recipient, String subject, String body) {
+    private MessageDTO messageDTO(Message message) {
+        return mapper.toDTO(message, messageDAO.getAttachments(message.getId()));
+    }
+
+    //--------------------------------------------------------------
+
+    private Message save(User sender, User recipient, String subject, String body, List<UUID> attachmentIds) {
         Message message = mapper.toEntity(MessageDTO.builder()
                 .senderId(sender.getId()).recipientId(recipient.getId())
                 .subject(subject).body(body).createdAt(LocalDateTime.now(clock).toString()).read(false).build());
         message.setSender(sender);
         message.setRecipient(recipient);
         try {
-            return messageDAO.create(message);
+            if (attachmentIds.isEmpty()) return messageDAO.create(message);
+            return messageDAO.createWithAttachments(message, attachmentIds,
+                    files -> FileService.validateAttachments(files, sender.getId(), clock.instant()));
+        } catch (ApiException exception) {
+            throw exception;
         } catch (RuntimeException exception) {
+            LOGGER.error("Message persistence failed.", exception);
             throw new ApiException(500, "Beskeden kunne ikke gemmes.");
         }
     }

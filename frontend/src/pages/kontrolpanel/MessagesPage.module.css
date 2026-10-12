@@ -172,11 +172,21 @@
 
 .composer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 44px;
+  grid-template-columns: minmax(0, 1fr) 44px 44px;
   align-items: center;
   gap: 10px;
   border-top: 1px solid #cfc8aa;
   padding-top: 16px;
+}
+
+.uploadStatus {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.attachments {
+  margin: 10px 0 0;
+  padding-left: 20px;
 }
 
 .composer button {

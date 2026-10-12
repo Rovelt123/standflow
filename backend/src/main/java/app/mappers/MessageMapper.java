@@ -1,6 +1,9 @@
 package app.mappers;
 
 import app.dtos.MessageDTO;
+import app.dtos.FileDTO;
+import app.entities.UploadedFile;
+import java.util.List;
 import app.entities.Message;
 import app.entities.User;
 import app.mappers.generic.IMapper;
@@ -33,5 +36,13 @@ public class MessageMapper implements IMapper<Message, MessageDTO> {
                 .createdAt(entity.getCreatedAt().toString())
                 .read(entity.isRead())
                 .build();
+    }
+
+    //--------------------------------------------------------------
+
+    public MessageDTO toDTO(Message entity, List<UploadedFile> attachments) {
+        MessageDTO dto = toDTO(entity);
+        dto.setAttachments(attachments.stream().map(FileDTO::from).toList());
+        return dto;
     }
 }
