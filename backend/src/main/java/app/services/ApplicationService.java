@@ -357,16 +357,16 @@ public class ApplicationService {
         if (request == null) {
             throw new ApiException(400, "Ansøgningen skal være et JSON-objekt.");
         }
-        String company = requiredText(request.getCompany(), "Virksomhedsnavn", 200);
+        String company = optionalText(request.getCompany(), "Virksomhedsnavn", 200);
         String contact = requiredText(request.getContact(), "Kontaktperson", 150);
-        String cvr = requiredText(request.getCvr(), "CVR", 8);
+        String cvr = optionalText(request.getCvr(), "CVR", 8);
         String email = requiredText(request.getEmail(), "E-mailadresse", 254);
         String phone = requiredText(request.getPhone(), "Telefonnummer", 30);
         String address = requiredText(request.getAddress(), "Adresse", 255);
         String city = requiredText(request.getCity(), "Postnr. og by", 150);
         String products = requiredText(request.getProducts(), "Produktbeskrivelse", 5000);
         String standType = requiredText(request.getStandType(), "Standtype", 1);
-        if (!cvr.matches("[0-9]{8}")) {
+        if (!cvr.isEmpty() && !cvr.matches("[0-9]{8}")) {
             throw new ApiException(400, "CVR skal bestå af præcis 8 cifre.");
         }
         if (!email.matches("[^\\s@]+@[^\\s@.]+(?:\\.[^\\s@.]+)+")) {
@@ -392,6 +392,13 @@ public class ApplicationService {
                 .address(address).city(city).website(normalizeWebsite(request.getWebsite()))
                 .products(products).previousExhibitor(request.getPreviousExhibitor()).standType(standType)
                 .tables(request.getTables()).chairs(request.getChairs()).build();
+    }
+
+    //--------------------------------------------------------------
+
+    private String optionalText(String value, String label, int maximumLength) {
+        if (value == null || value.isBlank()) return "";
+        return requiredText(value, label, maximumLength);
     }
 
     //--------------------------------------------------------------

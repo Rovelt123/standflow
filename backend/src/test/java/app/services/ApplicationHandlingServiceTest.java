@@ -15,6 +15,53 @@ import static org.junit.jupiter.api.Assertions.*;
 class ApplicationHandlingServiceTest extends ApplicationTestSupport {
 
     @Test
+    void privateApplicantsCanCreateAndEditWithoutCompanyCvrOrWebsite() throws Exception {
+        UUID userId = UUID.randomUUID();
+        for (String empty : new String[]{null, "", "   "}) {
+            var body = validBody();
+            for (String field : new String[]{"company", "cvr", "website"}) {
+                if (empty == null) body.remove(field);
+                else body.put(field, empty);
+            }
+            Application saved = service.create(request(body), userId);
+            em.clear();
+            saved = service.getById(saved.getId());
+            assertEquals("", saved.getCompany());
+            assertEquals("", saved.getCvr());
+            assertNull(saved.getWebsite());
+            assertTrue(new SimpleApplicationPdfGenerator().generate(saved).length > 0);
+            service.updateStatus(saved.getId(), Map.of("status", "INFO_REQUESTED"));
+            Application updated = service.updateOwn(saved.getId(), userId, request(body));
+            assertEquals("", updated.getCompany());
+            assertEquals("", updated.getCvr());
+            assertNull(updated.getWebsite());
+            assertEquals(ApplicationStatus.PENDING, updated.getStatus());
+        }
+        assertEquals(3, emailService.calls());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void optionalBusinessFieldsStillValidateProvidedValues() throws Exception {
+        for (String cvr : new String[]{"1234", "123456789", "abcdefgh"}) {
+            var input = request(validBody());
+            input.setCvr(cvr);
+            assertEquals(400, assertThrows(ApiException.class, () -> service.create(input)).getStatus());
+        }
+        var input = request(validBody());
+        input.setCompany("x".repeat(201));
+        assertEquals(400, assertThrows(ApiException.class, () -> service.create(input)).getStatus());
+        input.setCompany("");
+        input.setWebsite("javascript:alert(1)");
+        assertEquals(400, assertThrows(ApiException.class, () -> service.create(input)).getStatus());
+        assertEquals(0, countApplications());
+        assertEquals(0, emailService.calls());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
     void pdfFailureLeavesExactlyOneSavedApplicationAndDoesNotSend() throws Exception {
         pdfGenerator.failWith(new ApiException(500, "PDF generation failed"));
         var input = request(validBody());
