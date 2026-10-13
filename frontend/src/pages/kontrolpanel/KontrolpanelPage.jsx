@@ -8,6 +8,8 @@ import ApplicationDetail from '../../components/admin/ApplicationDetail.jsx'
 import { portalRequest } from '../portal/portalApi.js'
 import styles from './KontrolpanelPage.module.css'
 import { applicationSearchScore } from './applicationSearch.js'
+import { saveApplicationChanges } from './applicationChanges.js'
+import { hasParticipatedBefore } from './applicationParticipation.js'
 
 function countBy(applications, status) {
   return applications.filter(application => application.status === status).length
@@ -28,7 +30,7 @@ function buildCsv(rows) {
   for (const a of rows) {
     lines.push([
       a.company, a.contact, a.cvr, a.email, a.phone, a.address, a.city, a.website, a.products,
-      a.previousExhibitor == null ? '' : a.previousExhibitor ? 'Ja' : 'Nej',
+      hasParticipatedBefore(a) ? 'Ja' : 'Nej',
       a.standType, a.tables, a.chairs, a.status, a.createdAt, a.comment,
     ].map(csvCell).join(';'))
   }
@@ -40,24 +42,41 @@ function KontrolpanelPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [actionError, setActionError] = useState('')
+  const [actionMessage, setActionMessage] = useState('')
   const [busyId, setBusyId] = useState(null)
   const [selected, setSelected] = useState(null)
   const [query, setQuery] = useState('')
   const [standTypeFilter, setStandTypeFilter] = useState('ALL')
+  const [participationFilter, setParticipationFilter] = useState('ALL')
   const [sortBy, setSortBy] = useState('date-desc')
+  const [marketYear, setMarketYear] = useState('')
+  const [currentYear, setCurrentYear] = useState(null)
+  const [revision, setRevision] = useState(0)
 
   useEffect(() => {
+    let active = true
+    portalRequest('/applications/market-year').then(data => {
+      if (active) {
+        setCurrentYear(data.marketYear)
+        setMarketYear(String(data.marketYear))
+      }
+    }).catch(caught => { if (active) { setError(caught.message); setLoading(false) } })
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    if (!marketYear) return
     let active = true
     setLoading(true)
     setError('')
 
-    portalRequest('/applications')
+    portalRequest(`/applications?year=${encodeURIComponent(marketYear)}`)
       .then(data => { if (active) setApplications(Array.isArray(data) ? data : []) })
       .catch(caught => { if (active) setError(caught.message) })
       .finally(() => { if (active) setLoading(false) })
 
     return () => { active = false }
-  }, [])
+  }, [marketYear, revision])
 
   const stats = useMemo(() => [
     { label: 'Indkomne ansøgninger', value: String(applications.length), note: 'I alt', tone: 'default' },
@@ -70,6 +89,7 @@ function KontrolpanelPage() {
     const q = query.trim().toLowerCase()
     const filtered = applications.filter((a) => {
       if (standTypeFilter !== 'ALL' && a.standType !== standTypeFilter) return false
+      if (participationFilter !== 'ALL' && hasParticipatedBefore(a) !== (participationFilter === 'YES')) return false
       return applicationSearchScore(a, q) >= 0
     })
     const sorted = [...filtered]
@@ -84,37 +104,37 @@ function KontrolpanelPage() {
     }
     if (q) sorted.sort((a, b) => applicationSearchScore(b, q) - applicationSearchScore(a, q))
     return sorted
-  }, [applications, query, standTypeFilter, sortBy])
+  }, [applications, query, standTypeFilter, participationFilter, sortBy])
 
   function applyUpdated(updated) {
     setApplications(current => current.map(item => (item.id === updated.id ? updated : item)))
     setSelected(current => (current && current.id === updated.id ? updated : current))
   }
 
-  async function onStatusChange(id, status) {
-    setBusyId(id)
+  //--------------------------------------------------------------
+
+  async function onSave(application, values) {
+    if (busyId) return false
+    setBusyId(application.id)
     setActionError('')
+    setActionMessage('')
     try {
-      applyUpdated(await portalRequest(`/applications/${id}/status`, 'PATCH', { status }))
+      const notification = await saveApplicationChanges(application, values, portalRequest, applyUpdated)
+      if (notification === 'FAILED') {
+        setActionError('Ændringerne er gemt, men mailen kunne ikke sendes. Kontakt kontaktpersonen manuelt.')
+      } else {
+        setActionMessage(notification === 'SENT' ? 'Ændringerne er gemt, og mailen er sendt.' : 'Ændringerne er gemt.')
+      }
+      return true
     } catch (caught) {
-      setActionError(caught.message)
+      setActionError(`${caught.message} Eventuelle allerede gemte ændringer er bevaret. Kontrollér rækken, før du prøver igen.`)
+      return false
     } finally {
       setBusyId(null)
     }
   }
 
-  async function onCommentSave(id, comment, customerNote) {
-    setBusyId(id)
-    setActionError('')
-    try {
-      applyUpdated(await portalRequest(`/applications/${id}/comment`, 'PUT', { comment, customerNote }))
-    } catch (caught) {
-      setActionError(caught.message)
-    } finally {
-      setBusyId(null)
-    }
-  }
-
+  //--------------------------------------------------------------
   function exportCsv() {
     const csv = buildCsv(visible)
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -139,6 +159,18 @@ function KontrolpanelPage() {
           ))}
         </div>
         <ApplicationsToolbar
+          participation={participationFilter}
+          onParticipationChange={setParticipationFilter}
+          marketYear={marketYear}
+          currentYear={currentYear}
+          yearDisabled={!currentYear || Boolean(busyId)}
+          onYearChange={year => {
+            setMarketYear(year)
+            setApplications([])
+            setSelected(null)
+            setActionError('')
+            setActionMessage('')
+          }}
           query={query}
           onQueryChange={setQuery}
           standType={standTypeFilter}
@@ -152,21 +184,26 @@ function KontrolpanelPage() {
         {loading && <p role="status">Henter ansøgninger …</p>}
         {error && <p role="alert">{error}</p>}
         {actionError && <p role="alert">{actionError}</p>}
-        {!loading && !error && applications.length === 0 && <p>Ingen ansøgninger endnu.</p>}
+        {actionMessage && <p role="status">{actionMessage}</p>}
+        {!loading && !error && applications.length === 0 && <p>Ingen ansøgninger for det valgte markedsår.</p>}
         {!loading && !error && applications.length > 0 && visible.length === 0 && (
           <p>Ingen ansøgninger matcher søgningen eller filteret.</p>
         )}
         {!loading && !error && visible.length > 0 && (
           <ApplicationsTable
             applications={visible}
-            onStatusChange={onStatusChange}
-            onCommentSave={onCommentSave}
+            onSave={onSave}
             onSelect={setSelected}
             busyId={busyId}
           />
         )}
       </main>
-      <ApplicationDetail application={selected} onClose={() => setSelected(null)} />
+      <ApplicationDetail application={selected} onClose={() => setSelected(null)} currentYear={currentYear}
+        onUpdated={updated => { applyUpdated(updated); setRevision(value => value + 1) }}
+        onHistorySelect={async id => {
+          try { setSelected(await portalRequest(`/applications/${id}`)) }
+          catch (caught) { setActionError(caught.message) }
+        }} />
     </div>
   )
 }

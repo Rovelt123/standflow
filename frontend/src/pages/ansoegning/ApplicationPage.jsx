@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { submitApplication } from './applicationApi.js'
 import { getCurrentUser } from '../public/authApi.js'
-import { prefillApplication } from './applicationDefaults.js'
+import { prefillApplication, reusableApplicationValues } from './applicationDefaults.js'
 import { portalRequest } from '../portal/portalApi.js'
 import styles from './ApplicationPage.module.css'
 
@@ -49,6 +49,9 @@ function ApplicationPage() {
   const [profileError, setProfileError] = useState('')
   const [loadingApplication, setLoadingApplication] = useState(Boolean(id))
   const [editAllowed, setEditAllowed] = useState(false)
+  const [previousApplications, setPreviousApplications] = useState([])
+  const [selectedPrevious, setSelectedPrevious] = useState('')
+  const [historyError, setHistoryError] = useState('')
 
   useEffect(() => {
     let active = true
@@ -67,8 +70,26 @@ function ApplicationPage() {
     }).catch(() => {
       if (active) setProfileError('Dine brugeroplysninger kunne ikke hentes. Du kan stadig udfylde felterne selv.')
     })
+    portalRequest('/applications/reusable').then(applications => {
+      if (active) {
+        setPreviousApplications(applications)
+        setValues(current => ({ ...current, previousExhibitor: applications.length > 0 }))
+      }
+    }).catch(() => {
+      if (active) setHistoryError('Tidligere ansøgninger kunne ikke hentes. Du kan stadig udfylde en ny ansøgning.')
+    })
     return () => { active = false }
   }, [id])
+
+  //--------------------------------------------------------------
+
+  function reuseApplication(applicationId) {
+    setSelectedPrevious(applicationId)
+    const previous = previousApplications.find(application => application.id === applicationId)
+    const reusable = reusableApplicationValues(previous, standTypes.map(type => type.id))
+    Object.keys(reusable).forEach(field => editedFields.current.add(field))
+    setValues(reusable)
+  }
 
   //--------------------------------------------------------------
 
@@ -126,14 +147,27 @@ function ApplicationPage() {
             <form onSubmit={handleSubmit} aria-labelledby="application-title" aria-busy={sending}>
               {error && <p className={styles.error} role="alert" tabIndex={-1} ref={messageRef}>{error}</p>}
               {profileError && <p role="status">{profileError}</p>}
+              {historyError && <p role="status">{historyError}</p>}
               {loadingApplication && <p role="status">Henter din ansøgning…</p>}
               {id && <Link to="/brugerportal">Tilbage til min brugerportal</Link>}
               <fieldset className={styles.columns} disabled={sending || loadingApplication || (Boolean(id) && !editAllowed)}>
-                <div className={styles.companyColumn}>
                   <div className={styles.introduction}>
                     <h1 id="application-title">{id ? 'Ret din ansøgning' : 'Stadeholder information'}</h1>
                     <p>Udfyld formularen nedenfor med dine virksomhedsoplysninger og stand-ønsker.</p>
+                    {!id && previousApplications.length > 0 && (
+                      <div>
+                        <label htmlFor="previous-application">Genbrug en tidligere ansøgning</label>
+                        <p>Vælg en ansøgning for at udfylde felterne igen. Kontrollér oplysningerne, før du sender.</p>
+                        <select id="previous-application" value={selectedPrevious} onChange={event => reuseApplication(event.target.value)}>
+                          <option value="">Start uden genbrug</option>
+                          {previousApplications.map(previous => (
+                            <option key={previous.id} value={previous.id}>{previous.marketYear ?? 'Ukendt år'} · {previous.company} · Type {previous.standType}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
+                <div className={styles.companyColumn}>
                   <section className={styles.company} aria-labelledby="company-title">
                     <h2 id="company-title">1. Virksomhed &amp; kontakt</h2>
                     <div className={styles.fields}>
@@ -148,16 +182,18 @@ function ApplicationPage() {
                         </div>
                       ))}
                       <div className={styles.fullWidth}>
-                        <label htmlFor="products">Beskrivelse af dine produkter *</label>
-                        <textarea id="products" name="products" required maxLength={5000}
+                        <div className={styles.productLabel}>
+                          <label htmlFor="products">Beskrivelse af dine produkter *</label>
+                          <span className={styles.help}>
+                            <button type="button" className={styles.helpButton} aria-label="Hjælp til produktbeskrivelse" aria-describedby="products-help">?</button>
+                            <span id="products-help" role="tooltip" className={styles.tooltip}>Teksten bruges som offentlig præsentation på siden Stadeholdere, når din ansøgning er godkendt. Præsentér boden, produkterne og eventuelle priser.</span>
+                          </span>
+                        </div>
+                        <textarea id="products" name="products" required maxLength={5000} aria-describedby="products-help"
+                          placeholder="Hos Byens Æbleskiver serverer vi lune, fyldige æbleskiver. 3 stk. koster 25 kr., 5 stk. 40 kr. og 10 stk. 75 kr. Du kan tilkøbe ekstra syltetøj for 5 kr."
                           value={values.products} onChange={event => changeValue('products', event.target.value)} />
                       </div>
                     </div>
-                    <label className={styles.previousExhibitor}>
-                      <input type="checkbox" name="previousExhibitor" checked={values.previousExhibitor}
-                        onChange={event => changeValue('previousExhibitor', event.target.checked)} />
-                      <span>Vi har tidligere været stadeholder på Engestofte Julemarked</span>
-                    </label>
                   </section>
                 </div>
                 <div className={styles.standColumn}>

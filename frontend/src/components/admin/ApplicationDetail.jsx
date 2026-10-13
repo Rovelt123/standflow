@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import StatusBadge from './StatusBadge.jsx'
 import styles from './ApplicationDetail.module.css'
+import ApplicationAdministration from './ApplicationAdministration.jsx'
 
 const FIELDS = [
   ['Virksomhed', (a) => a.company],
@@ -12,7 +13,8 @@ const FIELDS = [
   ['By', (a) => a.city],
   ['Website', (a) => a.website],
   ['Produkter', (a) => a.products],
-  ['Tidligere stadeholder', (a) => (a.previousExhibitor == null ? '' : a.previousExhibitor ? 'Ja' : 'Nej')],
+  ['Tidligere stadeholder (oplyst af ansøger)', (a) => (a.previousExhibitor == null ? '' : a.previousExhibitor ? 'Ja' : 'Nej')],
+  ['Markedsår', (a) => a.marketYear ?? 'Ukendt'],
   ['Standtype', (a) => (a.standType ? `Type ${a.standType}` : '')],
   ['Borde', (a) => (a.tables ?? '')],
   ['Stole', (a) => (a.chairs ?? '')],
@@ -24,7 +26,7 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('da-DK')
 }
 
-export default function ApplicationDetail({ application, onClose }) {
+export default function ApplicationDetail({ application, onClose, onUpdated, onHistorySelect, currentYear }) {
   useEffect(() => {
     function onKey(event) {
       if (event.key === 'Escape') onClose()
@@ -69,6 +71,9 @@ export default function ApplicationDetail({ application, onClose }) {
             )
           })}
         </dl>
+
+        {onUpdated && <ApplicationAdministration key={application.id} application={application}
+          onUpdated={onUpdated} onHistorySelect={onHistorySelect} currentYear={currentYear} />}
 
         {application.comment ? (
           <div className={styles.note}>

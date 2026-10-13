@@ -146,6 +146,14 @@ public abstract class ApplicationTestSupport {
 
         //--------------------------------------------------------------
 
+        @Override
+        public void sendStandTypeChange(Application application, String previousStandType) {
+            calls++;
+            if (failure != null) throw failure;
+        }
+
+        //--------------------------------------------------------------
+
         public int calls() {
             return calls;
         }

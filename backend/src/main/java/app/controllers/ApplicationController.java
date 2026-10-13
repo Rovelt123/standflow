@@ -49,6 +49,8 @@ public class ApplicationController extends BaseController<Application, Applicati
         return () -> {
             post("/applications", controller::create, Role.USER);
             get("/applications/mine", controller::getOwn, Role.USER);
+            get("/applications/reusable", controller::getReusable, Role.USER);
+            get("/applications/market-year", ctx -> ctx.json(Map.of("marketYear", applicationService.currentMarketYear())), Role.USER, Role.ADMIN);
             get("/applications/mine/{id}", controller::getOwnById, Role.USER);
             put("/applications/mine/{id}", controller::updateOwn, Role.USER);
             delete("/applications/mine/{id}", controller::deleteOwn, Role.USER);
@@ -56,6 +58,8 @@ public class ApplicationController extends BaseController<Application, Applicati
             get("/applications/{id}", controller::getByID, Role.ADMIN);
             patch("/applications/{id}/status", controller::updateStatus, Role.ADMIN);
             put("/applications/{id}/comment", controller::updateComment, Role.ADMIN);
+            put("/applications/{id}/history", controller::updateHistory, Role.ADMIN);
+            patch("/applications/{id}/stand-type", controller::updateStandType, Role.ADMIN);
         };
     }
 
@@ -91,7 +95,7 @@ public class ApplicationController extends BaseController<Application, Applicati
 
     @Override
     public void getAll(Context ctx) {
-        ctx.status(200).json(applicationService.getAll().stream().map(this::adminDTO).toList());
+        ctx.status(200).json(applicationService.getForYear(ctx.queryParam("year")).stream().map(this::adminDTO).toList());
     }
 
     //--------------------------------------------------------------
@@ -124,7 +128,32 @@ public class ApplicationController extends BaseController<Application, Applicati
     //--------------------------------------------------------------
 
     private AdminApplicationDTO adminDTO(Application application) {
-        return new AdminApplicationDTO(applicationMapper.toDTO(application), application.getInternalComment());
+        return new AdminApplicationDTO(applicationMapper.toDTO(application), application.getInternalComment(),
+                application.getAttended(), application.getStandLocation(),
+                applicationService.getHistory(application).stream().map(previous -> new AdminApplicationDTO.Participation(
+                        previous.getId(), previous.getMarketYear(), previous.getCompany(),
+                        previous.getStandType().name(), previous.getStandLocation())).toList());
+    }
+
+    //--------------------------------------------------------------
+
+    private void getReusable(Context ctx) {
+        ctx.json(applicationService.getReusable(currentUserId(ctx)).stream().map(applicationMapper::toDTO).toList());
+    }
+
+    //--------------------------------------------------------------
+
+    private void updateHistory(Context ctx) {
+        ctx.json(adminDTO(applicationService.updateHistory(applicationId(ctx),
+                ErrorHandler.tryBodyMap(ctx, "Ugyldig historik."))));
+    }
+
+    //--------------------------------------------------------------
+
+    private void updateStandType(Context ctx) {
+        var result = applicationService.updateStandType(applicationId(ctx),
+                ErrorHandler.tryBodyMap(ctx, "Ugyldig standtype."));
+        ctx.json(Map.of("application", adminDTO(result.application()), "notificationStatus", result.notificationStatus()));
     }
 
     //--------------------------------------------------------------

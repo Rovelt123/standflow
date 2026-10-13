@@ -53,6 +53,7 @@ public class ApplicationMapper implements IMapper<Application, ApplicationDTO> {
                 .status(entity.getStatus().name())
                 .createdAt(entity.getCreatedAt().toString())
                 .customerNote(entity.getCustomerNote())
+                .marketYear(entity.getMarketYear())
                 .build();
     }
 }

@@ -18,6 +18,12 @@ function ApplicationsToolbar({
   onExportCsv,
   resultCount,
   canExport,
+  marketYear,
+  currentYear,
+  onYearChange,
+  yearDisabled,
+  participation,
+  onParticipationChange,
 }) {
   return (
     <div className={styles.toolbar}>
@@ -36,6 +42,22 @@ function ApplicationsToolbar({
             onChange={(event) => onQueryChange(event.target.value)}
           />
         </label>
+        <span className={styles.separator} />
+        <select className={styles.select} value={marketYear} disabled={yearDisabled}
+          onChange={event => onYearChange(event.target.value)} aria-label="Filtrér efter markedsår">
+          {!currentYear && <option value="">Henter markedsår…</option>}
+          {currentYear && Array.from({ length: currentYear - 1899 + 1 }, (_, index) => currentYear + 1 - index).map(year => (
+            <option key={year} value={year}>Markedsår: {year}</option>
+          ))}
+          <option value="unknown">Markedsår: Ukendt</option>
+        </select>
+        <span className={styles.separator} />
+        <select className={styles.select} value={participation}
+          onChange={event => onParticipationChange(event.target.value)} aria-label="Filtrér efter tidligere deltagelse">
+          <option value="ALL">Alle</option>
+          <option value="YES">Deltaget før</option>
+          <option value="NO">Ikke deltaget før</option>
+        </select>
         <span className={styles.separator} />
         <select
           className={styles.select}
