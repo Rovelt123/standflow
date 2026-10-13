@@ -47,6 +47,7 @@ class UserControllerTest {
     private static String baseUrl;
     private static final java.util.List<String> welcomeRecipients = new java.util.concurrent.CopyOnWriteArrayList<>();
     private static boolean failWelcome;
+    private static final Map<String, String> resetTokens = new java.util.concurrent.ConcurrentHashMap<>();
 
     //--------------------------------------------------------------
 
@@ -62,7 +63,7 @@ class UserControllerTest {
             }
             welcomeRecipients.add(recipient.getEmail());
             if (failWelcome) throw new ApiException(500, "SMTP failed");
-        });
+        }, (recipient, token) -> resetTokens.put(recipient.getEmail(), token), Clock.systemUTC());
         server.getApp().unsafeConfig().router.apiBuilder(() -> path("/api", () -> {
             UserController.registerRoutes(userService).addEndpoints();
             ApplicationController.registerRoutes().addEndpoints();
@@ -85,6 +86,80 @@ class UserControllerTest {
             Setup.em.close();
         }
         if (emf != null) emf.close();
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void passwordResetIsPublicSingleUseAndInvalidatesSessions() throws Exception {
+        Map<String, Object> registration = registration();
+        String email = (String) registration.get("email");
+        String session = JSON.readTree(post("/users/auth/register", registration, null).body())
+                .path("data").path("token").asText();
+        var requested = post("/users/auth/forgot-password", Map.of("email", email.toUpperCase()), null);
+        assertEquals(200, requested.statusCode());
+        assertEquals(requested.body(), post("/users/auth/forgot-password",
+                Map.of("email", "missing@example.dk"), null).body());
+        String token = resetTokens.get(email);
+        assertNotNull(token);
+        assertFalse(requested.body().contains(token));
+        post("/users/auth/forgot-password", Map.of("email", email), null);
+        assertEquals(token, resetTokens.get(email), "Repeated requests are throttled");
+        try (var reader = emf.createEntityManager()) {
+            User user = new UserDAO(reader).getByEmail(email);
+            assertNotEquals(token, user.getPasswordResetHash());
+            assertEquals(64, user.getPasswordResetHash().length());
+        }
+        assertEquals(400, post("/users/auth/reset-password", Map.of("token", token,
+                "newPassword", "weak", "confirmPassword", "weak"), null).statusCode());
+        assertEquals(400, post("/users/auth/reset-password", Map.of("token", token,
+                "newPassword", "NewPassword!", "confirmPassword", "Different!"), null).statusCode());
+        Map<String, String> reset = Map.of("token", token, "newPassword", "NewPassword!", "confirmPassword", "NewPassword!");
+        assertEquals(204, post("/users/auth/reset-password", reset, null).statusCode());
+        assertEquals(400, post("/users/auth/reset-password", reset, null).statusCode());
+        assertEquals(401, request("GET", "/users/me", null, session).statusCode());
+        assertEquals(401, post("/users/auth/login", Map.of("email", email, "password", "StrongPassword!"), null).statusCode());
+        assertEquals(200, post("/users/auth/login", Map.of("email", email, "password", "NewPassword!"), null).statusCode());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void simultaneousResetRequestsOnlyConsumeTheTokenOnce() throws Exception {
+        Map<String, Object> registration = registration();
+        String email = (String) registration.get("email");
+        post("/users/auth/register", registration, null);
+        post("/users/auth/forgot-password", Map.of("email", email), null);
+        String body = JSON.writeValueAsString(Map.of("token", resetTokens.get(email),
+                "newPassword", "NewPassword!", "confirmPassword", "NewPassword!"));
+        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl + "/users/auth/reset-password"))
+                .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body)).build();
+        var first = CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+        var second = CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+        assertEquals(Set.of(204, 400), Set.of(first.get().statusCode(), second.get().statusCode()));
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void expiredAndReplacedResetTokensCannotChangePassword() throws Exception {
+        Map<String, Object> registration = registration();
+        String email = (String) registration.get("email");
+        post("/users/auth/register", registration, null);
+        post("/users/auth/forgot-password", Map.of("email", email), null);
+        String oldToken = resetTokens.get(email);
+        UserDAO dao = new UserDAO(Setup.em);
+        User user = dao.getByEmail(email);
+        user.setPasswordResetExpiresAt(java.time.Instant.now().minusSeconds(1));
+        user.setPasswordResetRequestedAt(java.time.Instant.now().minusSeconds(61));
+        dao.update(user);
+        assertEquals(400, post("/users/auth/reset-password", Map.of("token", oldToken,
+                "newPassword", "NewPassword!", "confirmPassword", "NewPassword!"), null).statusCode());
+        post("/users/auth/forgot-password", Map.of("email", email), null);
+        assertNotEquals(oldToken, resetTokens.get(email));
+        assertEquals(400, post("/users/auth/reset-password", Map.of("token", oldToken,
+                "newPassword", "NewPassword!", "confirmPassword", "NewPassword!"), null).statusCode());
+        assertEquals(400, post("/users/auth/forgot-password", Map.of("email", "invalid"), null).statusCode());
     }
 
     //--------------------------------------------------------------

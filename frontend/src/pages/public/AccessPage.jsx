@@ -76,5 +76,6 @@ export default function AccessPage({ register = false }) {
       {!register && <label className={styles.checkbox}><input name="rememberMe" type="checkbox" />Husk mig</label>}
       <button type="submit" disabled={submitting}>{submitting ? 'Vent venligst…' : register ? 'Registrer og fortsæt' : 'Log ind og fortsæt'}</button>
     </form>
+    {!register && <nav className={styles.tabs}><Link to="/glemt-adgangskode">Glemt adgangskode?</Link></nav>}
   </div></main></>
 }

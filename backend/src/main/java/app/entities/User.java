@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -65,6 +66,16 @@ public class User {
     @JsonIgnore
     @Column(name = "password_hash", nullable = false, length = 60)
     private String password;
+
+    @JsonIgnore
+    @Column(length = 64)
+    private String passwordResetHash;
+
+    @JsonIgnore
+    private Instant passwordResetExpiresAt;
+
+    @JsonIgnore
+    private Instant passwordResetRequestedAt;
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"))

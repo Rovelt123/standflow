@@ -44,6 +44,21 @@ class GmailSmtpEmailServiceTest {
     //--------------------------------------------------------------
 
     @Test
+    void passwordResetEmailContainsFrontendLinkAndExpiry() throws Exception {
+        new GmailSmtpPasswordResetEmailService(this::config, this::capture)
+                .sendReset(User.builder().email("reset@example.com").build(), "test-token");
+        assertEquals(1, sent.size());
+        MimeMessage email = sent.getFirst();
+        assertEnvelope(email, "reset@example.com");
+        assertEquals("Nulstil din adgangskode", email.getSubject());
+        String body = email.getContent().toString();
+        assertTrue(body.contains("/nulstil-adgangskode#token=test-token"));
+        assertTrue(body.contains("30 minutter"));
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
     void applicationDeliversGeneratedPdfWithConfiguredRecipientAndFilename() throws Exception {
         Application application = Application.builder().id(UUID.randomUUID()).company("Blå håndværk")
                 .email("applicant@example.com").build();

@@ -10,6 +10,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.time.Clock;
+import java.util.Base64;
+import java.util.HexFormat;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -21,6 +27,8 @@ public class UserService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(UserService.class);
     private final UserDAO userDAO;
+    private final PasswordResetEmailService passwordResetEmailService;
+    private final Clock clock;
     private final RegistrationEmailService registrationEmailService;
 
     //--------------------------------------------------------------
@@ -38,6 +46,15 @@ public class UserService {
     //--------------------------------------------------------------
 
     public UserService(UserDAO userDAO, RegistrationEmailService registrationEmailService) {
+        this(userDAO, registrationEmailService, new GmailSmtpPasswordResetEmailService(), Clock.systemUTC());
+    }
+
+    //--------------------------------------------------------------
+
+    public UserService(UserDAO userDAO, RegistrationEmailService registrationEmailService,
+                       PasswordResetEmailService passwordResetEmailService, Clock clock) {
+        this.passwordResetEmailService = passwordResetEmailService;
+        this.clock = clock;
         this.userDAO = userDAO;
         this.registrationEmailService = registrationEmailService;
     }
@@ -96,6 +113,53 @@ public class UserService {
             throw new ApiException(401, "Forkert e-mailadresse eller adgangskode.");
         }
         return user;
+    }
+
+    //--------------------------------------------------------------
+
+    public void forgotPassword(Map<String, ?> body) {
+        User user = userDAO.getByEmail(email(body));
+        if (user == null) return;
+        byte[] bytes = new byte[32];
+        new SecureRandom().nextBytes(bytes);
+        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        if (!userDAO.preparePasswordReset(user.getId(), resetTokenHash(token), clock.instant())) return;
+        try {
+            passwordResetEmailService.sendReset(user, token);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Password reset email failed. Check SMTP configuration or delivery.");
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    public void resetPassword(Map<String, ?> body) {
+        String token = requiredString(body, "token");
+        if (!token.matches("[A-Za-z0-9_-]{43}")) {
+            throw new ApiException(400, "Nulstillingslinket er ugyldigt eller udløbet.");
+        }
+        String password = requiredString(body, "newPassword");
+        PasswordService.passwordValidation(password);
+        if (password.getBytes(StandardCharsets.UTF_8).length > 72) {
+            throw new ApiException(400, "Adgangskoden må højst fylde 72 UTF-8 bytes.");
+        }
+        if (!password.equals(requiredString(body, "confirmPassword"))) {
+            throw new ApiException(400, "Adgangskoderne skal være ens.");
+        }
+        if (!userDAO.resetPassword(resetTokenHash(token), PasswordService.hashHelper(password), clock.instant())) {
+            throw new ApiException(400, "Nulstillingslinket er ugyldigt eller udløbet.");
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    private String resetTokenHash(String token) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(token.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException(exception);
+        }
     }
 
     //--------------------------------------------------------------
@@ -176,7 +240,11 @@ public class UserService {
         if (duplicate != null && !duplicate.getId().equals(id)) {
             throw new ApiException(409, "E-mailadressen er allerede registreret.");
         }
-        if (!user.getEmail().equals(email)) user.setTokenVersion(user.getTokenVersion() + 1);
+        if (!user.getEmail().equals(email)) {
+            user.setTokenVersion(user.getTokenVersion() + 1);
+            user.setPasswordResetHash(null);
+            user.setPasswordResetExpiresAt(null);
+        }
         user.setEmail(email);
         user.setCompany(company);
         user.setFirstname(firstname);
@@ -201,6 +269,8 @@ public class UserService {
         if (!password.equals(requiredString(body, "confirmPassword"))) {
             throw new ApiException(400, "De nye adgangskoder skal være ens.");
         }
+        user.setPasswordResetHash(null);
+        user.setPasswordResetExpiresAt(null);
         user.setPassword(PasswordService.hashHelper(password));
         user.setTokenVersion(user.getTokenVersion() + 1);
         return userDAO.update(user);

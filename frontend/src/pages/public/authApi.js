@@ -4,6 +4,40 @@ const tokenKey = 'standflow.auth.token'
 
 //--------------------------------------------------------------
 
+async function passwordRequest(action, fields, fetchRequest) {
+  let response
+  try {
+    response = await fetchRequest(`${apiBaseUrl}/users/auth/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fields),
+    })
+  } catch {
+    throw new Error('Kunne ikke kontakte serveren. Prøv igen.')
+  }
+  if (response.status === 400) {
+    throw new Error(await response.text().catch(() => '') || 'Kontrollér oplysningerne, eller bed om et nyt link.')
+  }
+  if (response.status !== (action === 'forgot-password' ? 200 : 204)) {
+    throw new Error('Kunne ikke nulstille adgangskoden. Prøv igen senere.')
+  }
+}
+
+//--------------------------------------------------------------
+
+export function requestPasswordReset(email, fetchRequest = fetch) {
+  return passwordRequest('forgot-password', { email }, fetchRequest)
+}
+
+//--------------------------------------------------------------
+
+export async function resetPassword(fields, fetchRequest = fetch) {
+  await passwordRequest('reset-password', fields, fetchRequest)
+  clearAuth()
+}
+
+//--------------------------------------------------------------
+
 export function clearAuth() {
   globalThis.localStorage?.removeItem(tokenKey)
   globalThis.sessionStorage?.removeItem(tokenKey)
