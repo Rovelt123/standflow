@@ -50,6 +50,10 @@ public class UserController extends BaseController<User, UserDTO> {
         return () -> {
             post("users/auth/register", controller::registerUser, Role.ANYONE);
             post("users/auth/login", controller::login, Role.ANYONE);
+            post("users/auth/verify-email", controller::verifyEmail, Role.ANYONE);
+            post("users/auth/resend-verification", controller::resendVerification, Role.ANYONE);
+            post("users/auth/forgot-password", controller::forgotPassword, Role.ANYONE);
+            post("users/auth/reset-password", controller::resetPassword, Role.ANYONE);
             get("users/me", controller::currentUser, Role.USER, Role.ADMIN);
             put("users/me", controller::updateProfile, Role.USER, Role.ADMIN);
             put("users/me/password", controller::changePassword, Role.USER, Role.ADMIN);
@@ -78,11 +82,26 @@ public class UserController extends BaseController<User, UserDTO> {
 
     private void registerUser(Context ctx) {
         Map<String, ?> body = ErrorHandler.tryBody(ctx, Map.class, Notifications.BODY_EMPTY.getDisplayName());
-        User user = userService.register(body);
-        UserDTO dto = userMapper.toDTO(user);
-        String token = securityService.createToken(dto);
-        String message = messageService.buildMessage(Notifications.REGISTER_SUCCESS, user.getFirstname());
-        respond(ctx, 201, message, Map.of("token", token, "data", dto));
+        userService.register(body);
+        ctx.header("Cache-Control", "no-store");
+        respond(ctx, 201, "Tjek din mail og bekræft din e-mailadresse, før du logger ind.",
+                Map.of("verificationRequired", true));
+    }
+
+    //--------------------------------------------------------------
+
+    private void verifyEmail(Context ctx) {
+        userService.verifyEmail(ErrorHandler.tryBody(ctx, Map.class, "Ugyldigt bekræftelseslink."));
+        ctx.header("Cache-Control", "no-store");
+        ctx.status(204);
+    }
+
+    //--------------------------------------------------------------
+
+    private void resendVerification(Context ctx) {
+        userService.resendVerification(ErrorHandler.tryBody(ctx, Map.class, "Ugyldig e-mailadresse."));
+        ctx.header("Cache-Control", "no-store");
+        ctx.status(200).json(Map.of("message", "Hvis kontoen afventer bekræftelse, modtager du en mail med et nyt link."));
     }
 
     //--------------------------------------------------------------
@@ -95,6 +114,22 @@ public class UserController extends BaseController<User, UserDTO> {
         String token = securityService.createToken(dto, rememberMe);
         String message = messageService.buildMessage(Notifications.LOGGED_IN, user.getFirstname());
         respond(ctx, 200, message, Map.of("token", token, "data", dto));
+    }
+
+    //--------------------------------------------------------------
+
+    private void forgotPassword(Context ctx) {
+        userService.forgotPassword(ErrorHandler.tryBody(ctx, Map.class, "Ugyldig e-mailadresse."));
+        ctx.header("Cache-Control", "no-store");
+        ctx.status(200).json(Map.of("message", "Hvis e-mailadressen er registreret, modtager du et nulstillingslink."));
+    }
+
+    //--------------------------------------------------------------
+
+    private void resetPassword(Context ctx) {
+        userService.resetPassword(ErrorHandler.tryBody(ctx, Map.class, "Ugyldig nulstilling."));
+        ctx.header("Cache-Control", "no-store");
+        ctx.status(204);
     }
 
     //--------------------------------------------------------------
