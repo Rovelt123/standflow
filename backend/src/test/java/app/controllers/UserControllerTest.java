@@ -170,7 +170,7 @@ class UserControllerTest {
 
     @Test
     void registrationPreservesValidationAndDuplicateDetection() throws Exception {
-        for (String field : new String[]{"company", "firstName", "lastName", "cvr", "email", "phone", "address", "city", "password", "confirmPassword"}) {
+        for (String field : new String[]{"firstName", "lastName", "email", "phone", "address", "city", "password", "confirmPassword"}) {
             Map<String, Object> request = registration();
             request.remove(field);
             assertEquals(400, post("/users/auth/register", request, null).statusCode(), field);
@@ -187,6 +187,24 @@ class UserControllerTest {
         request = registration();
         assertEquals(201, post("/users/auth/register", request, null).statusCode());
         assertEquals(409, post("/users/auth/register", request, null).statusCode());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void registrationAllowsMissingCompanyAndCvrButValidatesCvrWhenProvided() throws Exception {
+        Map<String, Object> request = registration();
+        request.remove("company");
+        request.remove("cvr");
+        HttpResponse<String> response = post("/users/auth/register", request, null);
+        assertEquals(201, response.statusCode(), response.body());
+        JsonNode user = JSON.readTree(response.body()).path("data").path("data");
+        assertEquals("", user.path("company").asText());
+        assertEquals("", user.path("cvr").asText());
+
+        request = registration();
+        request.put("cvr", "1234");
+        assertEquals(400, post("/users/auth/register", request, null).statusCode());
     }
 
     //--------------------------------------------------------------
