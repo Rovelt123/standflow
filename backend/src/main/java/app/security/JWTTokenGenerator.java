@@ -64,7 +64,7 @@ public class JWTTokenGenerator {
         User user = userDAO.getByEmail(email);
         String userId = signedJWT.getJWTClaimsSet().getStringClaim("userId");
         Integer version = signedJWT.getJWTClaimsSet().getIntegerClaim("tokenVersion");
-        if (user == null || !user.getId().toString().equals(userId)
+        if (user == null || !user.isEmailVerified() || !user.getId().toString().equals(userId)
                 || version == null || version != user.getTokenVersion()) {
             return null;
         }
