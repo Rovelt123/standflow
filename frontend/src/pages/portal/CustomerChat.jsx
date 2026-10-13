@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
-import { portalRequest } from './portalApi.js'
+import { useEffect, useRef, useState } from 'react'
+import { portalRequest, uploadFiles, downloadFile } from './portalApi.js'
+import FileUpload from './FileUpload.jsx'
 import styles from './CustomerChat.module.css'
 
 export default function CustomerChat({ user }) {
@@ -9,6 +10,27 @@ export default function CustomerChat({ user }) {
   const [error, setError] = useState('')
   const [subject, setSubject] = useState('')
   const [sending, setSending] = useState(false)
+  const [files, setFiles] = useState([])
+  const [attachmentIds, setAttachmentIds] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [downloads, setDownloads] = useState({})
+  const downloadsInFlight = useRef(new Set())
+
+  //--------------------------------------------------------------
+
+  async function handleDownload(file) {
+    if (downloadsInFlight.current.has(file.id)) return
+    downloadsInFlight.current.add(file.id)
+    setDownloads(current => ({ ...current, [file.id]: { loading: true, error: '' } }))
+    try {
+      await downloadFile(file.id, file.originalName)
+    } catch (failure) {
+      setDownloads(current => ({ ...current, [file.id]: { loading: true, error: failure.message } }))
+    } finally {
+      downloadsInFlight.current.delete(file.id)
+      setDownloads(current => ({ ...current, [file.id]: { ...current[file.id], loading: false } }))
+    }
+  }
 
   useEffect(() => {
     let active = true
@@ -45,15 +67,26 @@ export default function CustomerChat({ user }) {
   setError('')
 
   try {
+    let ids = attachmentIds
+    if (files.length && !ids.length) {
+      setUploading(true)
+      ids = (await uploadFiles(files)).map(file => file.id)
+      setAttachmentIds(ids)
+      setUploading(false)
+    }
     const saved = await portalRequest('/messages', 'POST', {
       subject: selectedSubject,
       body: message,
+      ...(ids.length ? { attachmentIds: ids } : {}),
     })
     setMessages(current => [...current, saved])
     setMessage('')
+    setFiles([])
+    setAttachmentIds([])
   } catch (failure) {
     setError(failure.message)
   } finally {
+    setUploading(false)
     setSending(false)
   }
 }
@@ -86,6 +119,19 @@ export default function CustomerChat({ user }) {
 
                     <div className={styles.bubble}>
                         {currentMessage.body}
+                        {currentMessage.attachments?.length > 0 && (
+                          <ul className={styles.attachments} aria-label="Vedhæftede filer">
+                            {currentMessage.attachments.map(file => (
+                              <li key={file.id}>
+                                <button type="button" className={styles.attachmentLink}
+                                  disabled={downloads[file.id]?.loading} aria-busy={downloads[file.id]?.loading || undefined}
+                                  onClick={() => handleDownload(file)}>{file.originalName}</button>
+                                {downloads[file.id]?.loading && <span role="status"> Forbereder download…</span>}
+                                {downloads[file.id]?.error && <span className={styles.downloadError} role="alert"> {downloads[file.id].error}</span>}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                     </div>
                     </div>
                 )
@@ -94,6 +140,7 @@ export default function CustomerChat({ user }) {
         </div>
 
       <form className={styles.inputArea} onSubmit={sendMessage}>
+        {uploading && <p className={styles.uploadStatus} role="status">Uploader filer…</p>}
         
         <input
             aria-label="Emne"
@@ -112,6 +159,10 @@ export default function CustomerChat({ user }) {
           maxLength={5000}
         />
 
+        <FileUpload files={files} disabled={sending} onError={setError} onChange={selected => {
+          setFiles(selected)
+          setAttachmentIds([])
+        }} />
         <button
             type="submit"
             aria-label="Send besked"

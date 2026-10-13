@@ -4,6 +4,7 @@ import app.daos.UserDAO;
 import app.dtos.UserDTO;
 import app.entities.User;
 import app.enums.Role;
+import app.exceptions.ApiException;
 import app.server.Setup;
 import io.javalin.http.Context;
 import io.javalin.http.UnauthorizedResponse;
@@ -47,6 +48,12 @@ public class AccessService implements IAccessService {
         UserDTO userDTO = ctx.attribute("user");
         assert userDTO != null;
         User user = userDAO.getById(userDTO.getId());
+        if (ctx.method().toString().equals("POST") && ctx.endpointHandlerPath().equals("/api/files")) {
+            if (user == null || user.getRoles().stream().noneMatch(role -> role == Role.USER || role == Role.ADMIN)) {
+                throw new ApiException(403, "Kun kunder og administratorer kan uploade filer.");
+            }
+            return;
+        }
         Set<RouteRole> allowedRoles = ctx.routeRoles(); // roles allowed for the current route
         if (!securityController.authorize(user, allowedRoles)) {
             throw new UnauthorizedResponse("Unauthorized with roles: " + user.getRoles() + ". Needed roles are: " + allowedRoles);

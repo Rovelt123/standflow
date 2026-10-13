@@ -65,7 +65,8 @@ class MessageControllerTest extends MessageTestSupport {
         var created = send("POST", "/api/messages", "{\"subject\":\"Question\",\"body\":\"Hello\"}", alice);
         assertEquals(201, created.statusCode());
         JsonNode dto = json.readTree(created.body());
-        assertEquals(7, dto.size());
+        assertEquals(8, dto.size());
+        assertTrue(dto.get("attachments").isEmpty());
         assertEquals(alice.getId().toString(), dto.get("senderId").asText());
         assertEquals(admin.getId().toString(), dto.get("recipientId").asText());
         assertFalse(dto.get("read").asBoolean());
@@ -349,7 +350,8 @@ class MessageControllerTest extends MessageTestSupport {
 
     private void assertMessageShape(JsonNode dto) {
         assertTrue(dto.isObject());
-        assertEquals(Set.of("id", "senderId", "recipientId", "subject", "body", "createdAt", "read"), fields(dto));
+        assertEquals(Set.of("id", "senderId", "recipientId", "subject", "body", "createdAt", "read", "attachments"), fields(dto));
+        assertTrue(dto.get("attachments").isArray());
         for (String field : List.of("id", "senderId", "recipientId", "subject", "body", "createdAt")) {
             assertTrue(dto.get(field).isTextual(), field);
         }

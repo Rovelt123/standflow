@@ -3,6 +3,7 @@ package app.dtos;
 import lombok.*;
 
 import java.util.UUID;
+import java.util.List;
 
 @Builder
 @NoArgsConstructor
@@ -17,4 +18,6 @@ public class MessageDTO {
     private String body;
     private String createdAt;
     private boolean read;
+    @Builder.Default
+    private List<FileDTO> attachments = List.of();
 }

@@ -13,4 +13,6 @@ backend/target/
 .env
 .env.*
 !.env.example
+# Public frontend URL used for production builds (no credentials)
+!frontend/.env.production
 .local/
