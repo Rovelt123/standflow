@@ -155,7 +155,7 @@ function ApplicationPage() {
                     <h1 id="application-title">{id ? 'Ret din ansøgning' : 'Stadeholder information'}</h1>
                     <p>Udfyld formularen nedenfor med dine virksomhedsoplysninger og stand-ønsker.</p>
                     {!id && previousApplications.length > 0 && (
-                      <div>
+                      <div className={styles.previousApplication}>
                         <label htmlFor="previous-application">Genbrug en tidligere ansøgning</label>
                         <p>Vælg en ansøgning for at udfylde felterne igen. Kontrollér oplysningerne, før du sender.</p>
                         <select id="previous-application" value={selectedPrevious} onChange={event => reuseApplication(event.target.value)}>
