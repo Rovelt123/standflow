@@ -9,6 +9,7 @@ import app.utils.ErrorHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.List;
@@ -22,6 +23,7 @@ public class UserService {
     private static final Logger LOGGER = LoggerFactory.getLogger(UserService.class);
     private final UserDAO userDAO;
     private final RegistrationEmailService registrationEmailService;
+    private final LocalFileStorage fileStorage;
 
     //--------------------------------------------------------------
 
@@ -38,8 +40,15 @@ public class UserService {
     //--------------------------------------------------------------
 
     public UserService(UserDAO userDAO, RegistrationEmailService registrationEmailService) {
+        this(userDAO, registrationEmailService, null);
+    }
+
+    //--------------------------------------------------------------
+
+    public UserService(UserDAO userDAO, RegistrationEmailService registrationEmailService, LocalFileStorage fileStorage) {
         this.userDAO = userDAO;
         this.registrationEmailService = registrationEmailService;
+        this.fileStorage = fileStorage;
     }
 
     //--------------------------------------------------------------
@@ -213,7 +222,16 @@ public class UserService {
         if (!booleanField(body, "confirmDelete")) {
             throw new ApiException(400, "Du skal bekræfte, at din bruger og dine data slettes.");
         }
-        userDAO.deleteAccount(user);
+        LocalFileStorage storage = fileStorage == null ? LocalFileStorage.fromEnvironment() : fileStorage;
+        List<String> storageKeys = userDAO.deleteAccount(user);
+        // Delete stored content only after the database transaction has committed.
+        for (String storageKey : storageKeys) {
+            try {
+                storage.delete(storageKey);
+            } catch (IOException | RuntimeException exception) {
+                LOGGER.error("Could not remove stored file {} after account deletion.", storageKey, exception);
+            }
+        }
     }
 
     //--------------------------------------------------------------

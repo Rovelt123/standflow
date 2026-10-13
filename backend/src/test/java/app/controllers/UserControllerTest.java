@@ -3,8 +3,14 @@ package app.controllers;
 import app.configs.TestHibernateConfig;
 import app.daos.UserDAO;
 import app.daos.ApplicationDAO;
+import app.daos.FileDAO;
+import app.daos.MessageDAO;
+import app.daos.UnsubscribeTokenDAO;
 import app.entities.User;
 import app.entities.Application;
+import app.entities.Message;
+import app.entities.UnsubscribeToken;
+import app.entities.UploadedFile;
 import app.enums.Role;
 import app.mappers.UserMapper;
 import app.security.SecurityService;
@@ -13,6 +19,7 @@ import app.server.Setup;
 import app.services.PasswordService;
 import app.services.ApplicationService;
 import app.services.UserService;
+import app.services.LocalFileStorage;
 import app.exceptions.ApiException;
 import app.services.SimpleApplicationPdfGenerator;
 import app.utils.Utils;
@@ -23,14 +30,19 @@ import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.Set;
@@ -47,12 +59,15 @@ class UserControllerTest {
     private static String baseUrl;
     private static final java.util.List<String> welcomeRecipients = new java.util.concurrent.CopyOnWriteArrayList<>();
     private static boolean failWelcome;
+    @TempDir private static Path uploadDirectory;
+    private static LocalFileStorage fileStorage;
 
     //--------------------------------------------------------------
 
     @BeforeAll
     static void startServer() {
         emf = TestHibernateConfig.getTestEmf();
+        fileStorage = new LocalFileStorage(uploadDirectory);
         server = new Setup(emf.createEntityManager(), 0);
         server.getApp().exception(ApiException.class, (error, ctx) -> ctx.status(error.getStatus()).result(error.getMessage()));
         server.getApp().exception(Exception.class, (error, ctx) -> ctx.status(500).result(error.getMessage()));
@@ -62,7 +77,7 @@ class UserControllerTest {
             }
             welcomeRecipients.add(recipient.getEmail());
             if (failWelcome) throw new ApiException(500, "SMTP failed");
-        });
+        }, fileStorage);
         server.getApp().unsafeConfig().router.apiBuilder(() -> path("/api", () -> {
             UserController.registerRoutes(userService).addEndpoints();
             ApplicationController.registerRoutes().addEndpoints();
@@ -426,6 +441,35 @@ class UserControllerTest {
         UUID secondUserId = UUID.fromString(secondData.path("data").path("id").asText());
 
         UUID firstApplicationId = createAdminTestApplication(firstToken);
+        UserDAO users = new UserDAO(Setup.em);
+        User firstUser = users.getById(firstUserId);
+        User secondUser = users.getById(secondUserId);
+        secondUser.getRoles().add(Role.ADMIN);
+        users.update(secondUser);
+        MessageDAO messages = new MessageDAO(Setup.em);
+        Message sent = messages.create(Message.builder().sender(firstUser).recipient(secondUser)
+                .subject("Documents").body("Attached").createdAt(LocalDateTime.now()).build());
+        Message received = messages.create(Message.builder().sender(secondUser).recipient(firstUser)
+                .subject("Reply").body("Attached").createdAt(LocalDateTime.now()).build());
+        String thirdToken = tokenFor(Role.USER);
+        User thirdUser = users.getById(UUID.fromString(SignedJWT.parse(thirdToken).getJWTClaimsSet().getStringClaim("userId")));
+        Message retainedMessage = messages.create(Message.builder().sender(secondUser).recipient(thirdUser)
+                .subject("Other conversation").body("Attached").createdAt(LocalDateTime.now()).build());
+        List<UploadedFile> deletedFiles = List.of(createDeletionTestFile(firstUser, sent),
+                createDeletionTestFile(secondUser, received), createDeletionTestFile(firstUser, null));
+        List<UploadedFile> retainedFiles = List.of(createDeletionTestFile(secondUser, null),
+                createDeletionTestFile(secondUser, retainedMessage));
+        UnsubscribeToken activeToken = createDeletionTestToken(firstUser, false);
+        UnsubscribeToken revokedToken = createDeletionTestToken(firstUser, true);
+        UnsubscribeToken retainedToken = createDeletionTestToken(secondUser, false);
+
+        assertEquals(400, request("DELETE", "/users/me", Map.of(
+                "currentPassword", "WrongPassword!", "confirmDelete", true), firstToken).statusCode());
+        assertEquals(400, request("DELETE", "/users/me", Map.of(
+                "currentPassword", "StrongPassword!", "confirmDelete", false), firstToken).statusCode());
+        assertNotNull(users.getById(firstUserId));
+        deletedFiles.forEach(file -> assertTrue(fileStorage.exists(file.getStorageKey())));
+
         HttpResponse<String> deleted = request("DELETE", "/users/me", Map.of(
                 "currentPassword", "StrongPassword!",
                 "confirmDelete", true,
@@ -436,7 +480,23 @@ class UserControllerTest {
             assertNull(reader.find(User.class, firstUserId));
             assertNotNull(reader.find(User.class, secondUserId));
             assertNull(reader.find(Application.class, firstApplicationId));
+            assertNull(reader.find(Message.class, sent.getId()));
+            assertNull(reader.find(Message.class, received.getId()));
+            assertNotNull(reader.find(Message.class, retainedMessage.getId()));
+            assertNotNull(reader.find(User.class, thirdUser.getId()));
+            for (UploadedFile file : deletedFiles) {
+                assertNull(reader.find(UploadedFile.class, file.getId()));
+                assertFalse(fileStorage.exists(file.getStorageKey()));
+            }
+            assertNull(reader.find(UnsubscribeToken.class, activeToken.getId()));
+            assertNull(reader.find(UnsubscribeToken.class, revokedToken.getId()));
+            assertNotNull(reader.find(UnsubscribeToken.class, retainedToken.getId()));
+            for (UploadedFile file : retainedFiles) {
+                assertNotNull(reader.find(UploadedFile.class, file.getId()));
+                assertTrue(fileStorage.exists(file.getStorageKey()));
+            }
         }
+        assertEquals(401, request("GET", "/users/me", null, firstToken).statusCode());
     }
 
     //--------------------------------------------------------------
@@ -471,6 +531,23 @@ class UserControllerTest {
         var legacy = request("PUT", path, Map.of("comment", "Legacy update"), admin);
         assertEquals(200, legacy.statusCode());
         assertEquals("Oplys venligst dit CVR", JSON.readTree(legacy.body()).path("customerNote").asText());
+    }
+
+    //--------------------------------------------------------------
+
+    private static UploadedFile createDeletionTestFile(User uploader, Message message) throws Exception {
+        String key = fileStorage.store(new byte[]{1, 2, 3}, "pdf");
+        return new FileDAO(Setup.em).create(UploadedFile.builder().uploadedBy(uploader).message(message)
+                .originalName("document.pdf").storageKey(key).contentType("application/pdf")
+                .size(3).uploadedAt(Instant.now()).build());
+    }
+
+    //--------------------------------------------------------------
+
+    private static UnsubscribeToken createDeletionTestToken(User user, boolean revoked) {
+        return new UnsubscribeTokenDAO(Setup.em).create(UnsubscribeToken.builder().user(user)
+                .tokenHash(UUID.randomUUID().toString().replace("-", "").repeat(2))
+                .createdAt(LocalDateTime.now()).expiresAt(LocalDateTime.now().plusDays(1)).revoked(revoked).build());
     }
 
     //--------------------------------------------------------------
