@@ -6,6 +6,7 @@ import app.exceptions.ApiException;
 import jakarta.persistence.EntityManager;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public class UserDAO extends EntityManagerDAO<User> {
@@ -42,12 +43,28 @@ public class UserDAO extends EntityManagerDAO<User> {
 
     //--------------------------------------------------------------
 
-    public void deleteAccount(User user) {
-        executeQuery(() -> {
+    public List<String> deleteAccount(User user) {
+        return executeQuery(() -> {
+            em.flush();
+            List<String> storageKeys = em.createQuery("""
+                    select f.storageKey from UploadedFile f
+                    left join f.message m
+                    where f.uploadedBy = :user or m.sender = :user or m.recipient = :user
+                    """, String.class).setParameter("user", user).getResultList();
+            if (!storageKeys.isEmpty()) {
+                em.createQuery("delete from UploadedFile f where f.storageKey in :storageKeys")
+                        .setParameter("storageKeys", storageKeys).executeUpdate();
+            }
+            em.createQuery("delete from Message m where m.sender.id = :userId or m.recipient.id = :userId")
+                    .setParameter("userId", user.getId()).executeUpdate();
+            em.createQuery("delete from UnsubscribeToken t where t.user.id = :userId")
+                    .setParameter("userId", user.getId()).executeUpdate();
             em.createQuery("delete from Application a where a.userId = :userId")
                     .setParameter("userId", user.getId()).executeUpdate();
-            em.remove(em.contains(user) ? user : em.merge(user));
-            return null;
+            // Bulk deletes leave cached entities behind; reload the user before removing it.
+            em.clear();
+            em.remove(em.find(User.class, user.getId()));
+            return storageKeys;
         });
     }
 
