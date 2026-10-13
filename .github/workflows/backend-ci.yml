@@ -35,6 +35,7 @@ jobs:
       - name: Test and package backend
         working-directory: backend
         env:
+          DEPLOYED: true
           UPLOAD_DIR: /tmp/standflow-uploads
         run: mvn --batch-mode --no-transfer-progress verify
       - name: Configure SSH

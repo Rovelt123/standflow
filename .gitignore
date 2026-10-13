@@ -16,3 +16,6 @@ backend/target/
 # Public frontend URL used for production builds (no credentials)
 !frontend/.env.production
 .local/
+
+# Runtime user-uploaded files must not be committed
+uploads/
