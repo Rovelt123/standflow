@@ -6,6 +6,7 @@ import KontrolpanelPage from './pages/kontrolpanel/KontrolpanelPage.jsx'
 import StadeholderePage from './pages/kontrolpanel/StadeholderePage.jsx'
 import ExhibitorsPage from './pages/public/ExhibitorsPage.jsx'
 import AccessPage from './pages/public/AccessPage.jsx'
+import EmailVerificationPage from './pages/public/EmailVerificationPage.jsx'
 import PasswordResetPage from './pages/public/PasswordResetPage.jsx'
 import { getAuthToken, subscribeAuth } from './pages/public/authApi.js'
 import PublicHeader from './components/layout/PublicHeader.jsx'
@@ -28,6 +29,7 @@ function App() {
         <Route path="/unsubscribe" element={<UnsubscribePage />} />
         <Route path="/messages" element={authenticated ? <MessagesRedirect /> : <Navigate to="/login" state={{ returnTo: '/messages' }} replace />} />
         <Route path="/login" element={<AccessPage key="login" />} />
+        <Route path="/bekraeft-email" element={<EmailVerificationPage />} />
         <Route path="/glemt-adgangskode" element={<PasswordResetPage key="forgot" />} />
         <Route path="/nulstil-adgangskode" element={<PasswordResetPage key="reset" reset />} />
         <Route path="/registrer" element={<AccessPage key="register" register />} />

@@ -31,6 +31,10 @@ export default function AccessPage({ register = false }) {
     setSubmitting(true)
     try {
       await authenticate(request, register)
+      if (register) {
+        navigate('/bekraeft-email', { replace: true, state: { registered: true, email: request.email } })
+        return
+      }
       const user = await getCurrentUser()
 
       navigate(
@@ -76,6 +80,6 @@ export default function AccessPage({ register = false }) {
       {!register && <label className={styles.checkbox}><input name="rememberMe" type="checkbox" />Husk mig</label>}
       <button type="submit" disabled={submitting}>{submitting ? 'Vent venligst…' : register ? 'Registrer og fortsæt' : 'Log ind og fortsæt'}</button>
     </form>
-    {!register && <nav className={styles.tabs}><Link to="/glemt-adgangskode">Glemt adgangskode?</Link></nav>}
+    {!register && <nav className={styles.tabs}><Link to="/glemt-adgangskode">Glemt adgangskode?</Link><Link to="/bekraeft-email">Send bekræftelsesmail igen</Link></nav>}
   </div></main></>
 }

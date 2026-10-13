@@ -47,6 +47,8 @@ class UserControllerTest {
     private static String baseUrl;
     private static final java.util.List<String> welcomeRecipients = new java.util.concurrent.CopyOnWriteArrayList<>();
     private static boolean failWelcome;
+    private static boolean failVerification;
+    private static final Map<String, String> verificationTokens = new java.util.concurrent.ConcurrentHashMap<>();
     private static final Map<String, String> resetTokens = new java.util.concurrent.ConcurrentHashMap<>();
 
     //--------------------------------------------------------------
@@ -63,7 +65,10 @@ class UserControllerTest {
             }
             welcomeRecipients.add(recipient.getEmail());
             if (failWelcome) throw new ApiException(500, "SMTP failed");
-        }, (recipient, token) -> resetTokens.put(recipient.getEmail(), token), Clock.systemUTC());
+        }, (recipient, token) -> resetTokens.put(recipient.getEmail(), token), Clock.systemUTC(), (recipient, token) -> {
+            if (failVerification) throw new ApiException(500, "SMTP failed");
+            verificationTokens.put(recipient.getEmail(), token);
+        });
         server.getApp().unsafeConfig().router.apiBuilder(() -> path("/api", () -> {
             UserController.registerRoutes(userService).addEndpoints();
             ApplicationController.registerRoutes().addEndpoints();
@@ -91,10 +96,83 @@ class UserControllerTest {
     //--------------------------------------------------------------
 
     @Test
+    void registrationRequiresVerificationBeforeLoginAndWelcome() throws Exception {
+        Map<String, Object> body = registration();
+        String email = (String) body.get("email");
+        var registered = post("/users/auth/register", body, null);
+        assertEquals(201, registered.statusCode());
+        assertTrue(JSON.readTree(registered.body()).path("data").path("verificationRequired").asBoolean());
+        assertFalse(registered.body().contains("token"));
+        assertFalse(welcomeRecipients.contains(email));
+        assertEquals(403, post("/users/auth/login", body, null).statusCode());
+        User user = new UserDAO(Setup.em).getByEmail(email);
+        assertFalse(user.isEmailVerified());
+        String token = verificationTokens.get(email);
+        assertNotNull(token);
+        assertNotEquals(token, user.getEmailVerificationHash());
+        assertEquals(64, user.getEmailVerificationHash().length());
+        String forgedSession = new SecurityService().createToken(new UserMapper().toDTO(user));
+        assertEquals(401, request("GET", "/users/me", null, forgedSession).statusCode());
+        post("/users/auth/forgot-password", Map.of("email", email), null);
+        assertEquals(400, post("/users/auth/verify-email", Map.of("token", resetTokens.get(email)), null).statusCode());
+        assertEquals(204, post("/users/auth/reset-password", Map.of("token", resetTokens.get(email),
+                "newPassword", "StrongPassword!", "confirmPassword", "StrongPassword!"), null).statusCode());
+        assertEquals(403, post("/users/auth/login", body, null).statusCode());
+        assertEquals(204, post("/users/auth/verify-email", Map.of("token", token), null).statusCode());
+        assertEquals(1, welcomeRecipients.stream().filter(email::equals).count());
+        assertEquals(400, post("/users/auth/verify-email", Map.of("token", token), null).statusCode());
+        assertEquals(1, welcomeRecipients.stream().filter(email::equals).count());
+        assertEquals(200, post("/users/auth/login", body, null).statusCode());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
+    void verificationCanBeResentAfterExpiryOrMailFailure() throws Exception {
+        Map<String, Object> body = registration();
+        String email = (String) body.get("email");
+        failVerification = true;
+        try {
+            assertEquals(201, post("/users/auth/register", body, null).statusCode());
+        } finally {
+            failVerification = false;
+        }
+        assertFalse(welcomeRecipients.contains(email));
+        UserDAO dao = new UserDAO(Setup.em);
+        User user = dao.getByEmail(email);
+        user.setEmailVerificationRequestedAt(java.time.Instant.now().minusSeconds(61));
+        dao.update(user);
+        var resent = post("/users/auth/resend-verification", Map.of("email", email), null);
+        assertEquals(200, resent.statusCode());
+        assertEquals(resent.body(), post("/users/auth/resend-verification", Map.of("email", "missing@example.dk"), null).body());
+        String oldToken = verificationTokens.get(email);
+        post("/users/auth/resend-verification", Map.of("email", email), null);
+        assertEquals(oldToken, verificationTokens.get(email));
+        user = dao.getByEmail(email);
+        user.setEmailVerificationExpiresAt(java.time.Instant.now().minusSeconds(1));
+        user.setEmailVerificationRequestedAt(java.time.Instant.now().minusSeconds(61));
+        dao.update(user);
+        assertEquals(400, post("/users/auth/verify-email", Map.of("token", oldToken), null).statusCode());
+        post("/users/auth/resend-verification", Map.of("email", email), null);
+        String newToken = verificationTokens.get(email);
+        assertNotEquals(oldToken, newToken);
+        assertEquals(400, post("/users/auth/verify-email", Map.of("token", oldToken), null).statusCode());
+        String json = JSON.writeValueAsString(Map.of("token", newToken));
+        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl + "/users/auth/verify-email"))
+                .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(json)).build();
+        var first = CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+        var second = CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+        assertEquals(Set.of(204, 400), Set.of(first.get().statusCode(), second.get().statusCode()));
+        assertEquals(1, welcomeRecipients.stream().filter(email::equals).count());
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
     void passwordResetIsPublicSingleUseAndInvalidatesSessions() throws Exception {
         Map<String, Object> registration = registration();
         String email = (String) registration.get("email");
-        String session = JSON.readTree(post("/users/auth/register", registration, null).body())
+        String session = JSON.readTree(registerAndVerify("/users/auth/register", registration, null).body())
                 .path("data").path("token").asText();
         var requested = post("/users/auth/forgot-password", Map.of("email", email.toUpperCase()), null);
         assertEquals(200, requested.statusCode());
@@ -128,7 +206,7 @@ class UserControllerTest {
     void simultaneousResetRequestsOnlyConsumeTheTokenOnce() throws Exception {
         Map<String, Object> registration = registration();
         String email = (String) registration.get("email");
-        post("/users/auth/register", registration, null);
+        registerAndVerify("/users/auth/register", registration, null);
         post("/users/auth/forgot-password", Map.of("email", email), null);
         String body = JSON.writeValueAsString(Map.of("token", resetTokens.get(email),
                 "newPassword", "NewPassword!", "confirmPassword", "NewPassword!"));
@@ -145,7 +223,7 @@ class UserControllerTest {
     void expiredAndReplacedResetTokensCannotChangePassword() throws Exception {
         Map<String, Object> registration = registration();
         String email = (String) registration.get("email");
-        post("/users/auth/register", registration, null);
+        registerAndVerify("/users/auth/register", registration, null);
         post("/users/auth/forgot-password", Map.of("email", email), null);
         String oldToken = resetTokens.get(email);
         UserDAO dao = new UserDAO(Setup.em);
@@ -169,8 +247,8 @@ class UserControllerTest {
         for (boolean marketing : new boolean[]{false, true}) {
             Map<String, Object> request = registration();
             request.put("acceptMarketing", marketing);
-            HttpResponse<String> response = post("/users/auth/register", request, null);
-            assertEquals(201, response.statusCode(), response.body());
+            HttpResponse<String> response = registerAndVerify("/users/auth/register", request, null);
+            assertEquals(200, response.statusCode(), response.body());
             assertEquals(1, welcomeRecipients.stream().filter(request.get("email")::equals).count());
             JsonNode data = JSON.readTree(response.body()).path("data");
             assertFalse(data.path("token").asText().isBlank());
@@ -197,17 +275,17 @@ class UserControllerTest {
         int before = welcomeRecipients.size();
         failWelcome = true;
         try {
-            assertEquals(201, post("/users/auth/register", body, null).statusCode());
+            assertEquals(200, registerAndVerify("/users/auth/register", body, null).statusCode());
         } finally {
             failWelcome = false;
         }
         assertEquals(before + 1, welcomeRecipients.size());
         assertEquals(200, post("/users/auth/login", Map.of("email", body.get("email"),
                 "password", body.get("password")), null).statusCode());
-        assertEquals(409, post("/users/auth/register", body, null).statusCode());
+        assertEquals(409, registerAndVerify("/users/auth/register", body, null).statusCode());
         body = registration();
         body.put("acceptTerms", false);
-        assertEquals(400, post("/users/auth/register", body, null).statusCode());
+        assertEquals(400, registerAndVerify("/users/auth/register", body, null).statusCode());
         assertEquals(before + 1, welcomeRecipients.size());
     }
 
@@ -219,11 +297,11 @@ class UserControllerTest {
             for (Object value : new Object[]{false, null, "true", 1}) {
                 Map<String, Object> request = registration();
                 request.put(field, value);
-                assertEquals(400, post("/users/auth/register", request, null).statusCode());
+                assertEquals(400, registerAndVerify("/users/auth/register", request, null).statusCode());
             }
             Map<String, Object> request = registration();
             request.remove(field);
-            assertEquals(400, post("/users/auth/register", request, null).statusCode());
+            assertEquals(400, registerAndVerify("/users/auth/register", request, null).statusCode());
         }
     }
 
@@ -233,12 +311,12 @@ class UserControllerTest {
     void marketingIsOptionalButMustBeBooleanWhenProvided() throws Exception {
         Map<String, Object> request = registration();
         request.remove("acceptMarketing");
-        HttpResponse<String> response = post("/users/auth/register", request, null);
-        assertEquals(201, response.statusCode());
+        HttpResponse<String> response = registerAndVerify("/users/auth/register", request, null);
+        assertEquals(200, response.statusCode());
         assertFalse(JSON.readTree(response.body()).path("data").path("data").path("acceptMarketing").asBoolean());
         request = registration();
         request.put("acceptMarketing", "false");
-        assertEquals(400, post("/users/auth/register", request, null).statusCode());
+        assertEquals(400, registerAndVerify("/users/auth/register", request, null).statusCode());
     }
 
     //--------------------------------------------------------------
@@ -248,20 +326,20 @@ class UserControllerTest {
         for (String field : new String[]{"firstName", "lastName", "email", "phone", "address", "city", "password", "confirmPassword"}) {
             Map<String, Object> request = registration();
             request.remove(field);
-            assertEquals(400, post("/users/auth/register", request, null).statusCode(), field);
+            assertEquals(400, registerAndVerify("/users/auth/register", request, null).statusCode(), field);
         }
         for (String password : new String[]{"short", "lowercase!", "UPPERCASE!", "NoSpecial123", "Ab!".repeat(11)}) {
             Map<String, Object> request = registration();
             request.put("password", password);
             request.put("confirmPassword", password);
-            assertEquals(400, post("/users/auth/register", request, null).statusCode());
+            assertEquals(400, registerAndVerify("/users/auth/register", request, null).statusCode());
         }
         Map<String, Object> request = registration();
         request.put("confirmPassword", "AnotherPassword!");
-        assertEquals(400, post("/users/auth/register", request, null).statusCode());
+        assertEquals(400, registerAndVerify("/users/auth/register", request, null).statusCode());
         request = registration();
-        assertEquals(201, post("/users/auth/register", request, null).statusCode());
-        assertEquals(409, post("/users/auth/register", request, null).statusCode());
+        assertEquals(200, registerAndVerify("/users/auth/register", request, null).statusCode());
+        assertEquals(409, registerAndVerify("/users/auth/register", request, null).statusCode());
     }
 
     //--------------------------------------------------------------
@@ -271,15 +349,15 @@ class UserControllerTest {
         Map<String, Object> request = registration();
         request.remove("company");
         request.remove("cvr");
-        HttpResponse<String> response = post("/users/auth/register", request, null);
-        assertEquals(201, response.statusCode(), response.body());
+        HttpResponse<String> response = registerAndVerify("/users/auth/register", request, null);
+        assertEquals(200, response.statusCode(), response.body());
         JsonNode user = JSON.readTree(response.body()).path("data").path("data");
         assertEquals("", user.path("company").asText());
         assertEquals("", user.path("cvr").asText());
 
         request = registration();
         request.put("cvr", "1234");
-        assertEquals(400, post("/users/auth/register", request, null).statusCode());
+        assertEquals(400, registerAndVerify("/users/auth/register", request, null).statusCode());
     }
 
     //--------------------------------------------------------------
@@ -287,7 +365,7 @@ class UserControllerTest {
     @Test
     void loginKeepsDefaultLifetimeAndRememberMeExtendsIt() throws Exception {
         Map<String, Object> request = registration();
-        assertEquals(201, post("/users/auth/register", request, null).statusCode());
+        assertEquals(200, registerAndVerify("/users/auth/register", request, null).statusCode());
         Map<String, Object> login = new HashMap<>(Map.of("email", request.get("email"), "password", request.get("password")));
         long defaultLifetime = Long.parseLong(Utils.getPropertyValue("TOKEN_EXPIRE_TIME", "config.properties"));
         for (Boolean rememberMe : new Boolean[]{null, false, true}) {
@@ -337,7 +415,7 @@ class UserControllerTest {
         application.put("previousExhibitor", false);
         assertEquals(401, post("/applications", application, null).statusCode());
         assertEquals(401, post("/applications", application, "invalid").statusCode());
-        HttpResponse<String> registered = post("/users/auth/register", registration(), null);
+        HttpResponse<String> registered = registerAndVerify("/users/auth/register", registration(), null);
         String token = JSON.readTree(registered.body()).path("data").path("token").asText();
         assertEquals(400, post("/applications", Map.of(), token).statusCode());
         HttpResponse<String> response = post("/test/applications", application, token);
@@ -409,7 +487,7 @@ class UserControllerTest {
     void currentUserReturnsOnlyTheAuthenticatedProfile() throws Exception {
         assertEquals(401, request("GET", "/users/me", null, null).statusCode());
         Map<String, Object> registration = registration();
-        HttpResponse<String> registered = post("/users/auth/register", registration, null);
+        HttpResponse<String> registered = registerAndVerify("/users/auth/register", registration, null);
         String token = JSON.readTree(registered.body()).path("data").path("token").asText();
         HttpResponse<String> response = request("GET", "/users/me", null, token);
         assertEquals(200, response.statusCode());
@@ -429,7 +507,7 @@ class UserControllerTest {
     void authenticatedUserCanReadAndChangeMarketingConsent() throws Exception {
         Map<String, Object> registration = registration();
         registration.put("acceptMarketing", true);
-        HttpResponse<String> registered = post("/users/auth/register", registration, null);
+        HttpResponse<String> registered = registerAndVerify("/users/auth/register", registration, null);
         String token = JSON.readTree(registered.body()).path("data").path("token").asText();
 
         HttpResponse<String> current = request("GET", "/users/me/consent", null, token);
@@ -464,7 +542,7 @@ class UserControllerTest {
     void unsubscribeRevokesMarketingConsentAndIsIdempotent() throws Exception {
         Map<String, Object> registration = registration();
         registration.put("acceptMarketing", true);
-        HttpResponse<String> registered = post("/users/auth/register", registration, null);
+        HttpResponse<String> registered = registerAndVerify("/users/auth/register", registration, null);
         String token = JSON.readTree(registered.body()).path("data").path("token").asText();
 
         for (int i = 0; i < 2; i++) {
@@ -490,13 +568,13 @@ class UserControllerTest {
                 Map.of("currentPassword", "StrongPassword!", "confirmDelete", true), null).statusCode());
 
         Map<String, Object> firstRegistration = registration();
-        HttpResponse<String> firstRegistered = post("/users/auth/register", firstRegistration, null);
+        HttpResponse<String> firstRegistered = registerAndVerify("/users/auth/register", firstRegistration, null);
         JsonNode firstData = JSON.readTree(firstRegistered.body()).path("data");
         String firstToken = firstData.path("token").asText();
         UUID firstUserId = UUID.fromString(firstData.path("data").path("id").asText());
 
         Map<String, Object> secondRegistration = registration();
-        HttpResponse<String> secondRegistered = post("/users/auth/register", secondRegistration, null);
+        HttpResponse<String> secondRegistered = registerAndVerify("/users/auth/register", secondRegistration, null);
         JsonNode secondData = JSON.readTree(secondRegistered.body()).path("data");
         UUID secondUserId = UUID.fromString(secondData.path("data").path("id").asText());
 
@@ -552,7 +630,7 @@ class UserControllerTest {
 
     private static String tokenFor(Role role) throws Exception {
         Map<String, Object> registration = registration();
-        assertEquals(201, post("/users/auth/register", registration, null).statusCode());
+        assertEquals(200, registerAndVerify("/users/auth/register", registration, null).statusCode());
         UserDAO dao = new UserDAO(Setup.em);
         User user = dao.getByEmail((String) registration.get("email"));
         user.setRoles(new HashSet<>(Set.of(Role.USER)));
@@ -600,6 +678,16 @@ class UserControllerTest {
         request.put("acceptPrivacy", true);
         request.put("acceptMarketing", false);
         return request;
+    }
+
+    //--------------------------------------------------------------
+
+    private static HttpResponse<String> registerAndVerify(String path, Map<String, Object> body, String token) throws Exception {
+        HttpResponse<String> registration = post(path, body, token);
+        if (registration.statusCode() != 201) return registration;
+        String email = ((String) body.get("email")).strip().toLowerCase(java.util.Locale.ROOT);
+        assertEquals(204, post("/users/auth/verify-email", Map.of("token", verificationTokens.get(email)), null).statusCode());
+        return post("/users/auth/login", body, null);
     }
 
     //--------------------------------------------------------------

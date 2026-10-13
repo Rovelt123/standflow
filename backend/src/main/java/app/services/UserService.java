@@ -29,6 +29,7 @@ public class UserService {
     private final UserDAO userDAO;
     private final PasswordResetEmailService passwordResetEmailService;
     private final Clock clock;
+    private final EmailVerificationService emailVerificationService;
     private final RegistrationEmailService registrationEmailService;
 
     //--------------------------------------------------------------
@@ -53,6 +54,15 @@ public class UserService {
 
     public UserService(UserDAO userDAO, RegistrationEmailService registrationEmailService,
                        PasswordResetEmailService passwordResetEmailService, Clock clock) {
+        this(userDAO, registrationEmailService, passwordResetEmailService, clock, new GmailSmtpEmailVerificationService());
+    }
+
+    //--------------------------------------------------------------
+
+    public UserService(UserDAO userDAO, RegistrationEmailService registrationEmailService,
+                       PasswordResetEmailService passwordResetEmailService, Clock clock,
+                       EmailVerificationService emailVerificationService) {
+        this.emailVerificationService = emailVerificationService;
         this.passwordResetEmailService = passwordResetEmailService;
         this.clock = clock;
         this.userDAO = userDAO;
@@ -74,6 +84,7 @@ public class UserService {
             throw new ApiException(400, "Betingelser og privatlivspolitik skal accepteres.");
         }
         User user = User.builder()
+                .emailVerified(false)
                 .company(optionalText(body, "company", 200))
                 .firstname(text(body, body.containsKey("firstName") ? "firstName" : "firstname", 75))
                 .lastname(text(body, body.containsKey("lastName") ? "lastName" : "lastname", 74))
@@ -95,11 +106,7 @@ public class UserService {
         }
         user.setPassword(PasswordService.hashHelper(password));
         User saved = userDAO.create(user);
-        try {
-            registrationEmailService.sendWelcome(saved);
-        } catch (RuntimeException exception) {
-            LOGGER.warn("Welcome email failed; registered account retained. Check SMTP configuration or delivery.");
-        }
+        sendVerification(saved);
         return saved;
     }
 
@@ -111,6 +118,49 @@ public class UserService {
         User user = userDAO.getByEmail(email);
         if (user == null || !PasswordService.passwordEquals(password, user.getPassword())) {
             throw new ApiException(401, "Forkert e-mailadresse eller adgangskode.");
+        }
+        if (!user.isEmailVerified()) {
+            throw new ApiException(403, "Bekræft din e-mailadresse, før du logger ind. Du kan bede om en ny bekræftelsesmail.");
+        }
+        return user;
+    }
+
+    //--------------------------------------------------------------
+
+    public void resendVerification(Map<String, ?> body) {
+        User user = userDAO.getByEmail(email(body));
+        if (user != null && !user.isEmailVerified()) sendVerification(user);
+    }
+
+    //--------------------------------------------------------------
+
+    private void sendVerification(User user) {
+        byte[] bytes = new byte[32];
+        new SecureRandom().nextBytes(bytes);
+        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        if (!userDAO.prepareEmailVerification(user.getId(), resetTokenHash(token), clock.instant())) return;
+        try {
+            emailVerificationService.sendVerification(user, token);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Verification email failed; pending account retained. Check SMTP configuration or delivery.");
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    public User verifyEmail(Map<String, ?> body) {
+        String token = requiredString(body, "token");
+        if (!token.matches("[A-Za-z0-9_-]{43}")) {
+            throw new ApiException(400, "Bekræftelseslinket er ugyldigt eller udløbet. Bed om et nyt link.");
+        }
+        User user = userDAO.verifyEmail(resetTokenHash(token), clock.instant());
+        if (user == null) {
+            throw new ApiException(400, "Bekræftelseslinket er ugyldigt eller udløbet. Bed om et nyt link.");
+        }
+        try {
+            registrationEmailService.sendWelcome(user);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Welcome email failed; verified account retained. Check SMTP configuration or delivery.");
         }
         return user;
     }

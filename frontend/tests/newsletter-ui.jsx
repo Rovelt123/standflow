@@ -3,6 +3,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import AccessPage from '../src/pages/public/AccessPage.jsx'
+import EmailVerificationPage from '../src/pages/public/EmailVerificationPage.jsx'
 import UnsubscribePage from '../src/pages/public/UnsubscribePage.jsx'
 import ProfileSettings from '../src/pages/portal/ProfileSettings.jsx'
 import PortalPage from '../src/pages/portal/PortalPage.jsx'
@@ -97,7 +98,7 @@ async function submit(form) {
 
 async function run() {
   handler = call => {
-    if (call.path === '/api/users/auth/register') return response({ data: { token } }, 201)
+    if (call.path === '/api/users/auth/register') return response({ data: { verificationRequired: true } }, 201)
     if (call.path === '/api/users/me') return response(user)
     throw new Error(`Unexpected request: ${call.path}`)
   }
@@ -114,6 +115,37 @@ async function run() {
   await click(marketing)
   await submit(document.querySelector('form'))
   check(calls.filter(call => call.method === 'POST').at(-1).body.acceptMarketing === true, 'Checked consent sends true')
+
+  handler = () => response({ data: { verificationRequired: true } }, 201)
+  await mount(<Routes><Route path="/" element={<AccessPage register />} />
+    <Route path="/bekraeft-email" element={<EmailVerificationPage />} /></Routes>)
+  await input(document.querySelector('[name="email"]'), 'new@example.dk')
+  await input(document.querySelector('[name="password"]'), 'Password!')
+  await input(document.querySelector('[name="confirmPassword"]'), 'Password!')
+  await submit(document.querySelector('form'))
+  check(calls.length === 1 && document.body.textContent.includes('Din konto er oprettet.'), 'Registration opens verification instructions without requesting a profile')
+  check(!sessionStorage.getItem('standflow.auth.token'), 'Pending registration does not establish a session')
+  check(!document.querySelector('[name="email"]') && document.querySelectorAll('button').length === 1 && !document.querySelector('a'), 'After registration only the resend action is available')
+  handler = () => response('', 200)
+  await click(button('Send bekræftelsesmail igen'))
+  check(calls.at(-1).body.email === 'new@example.dk', 'Resending uses the registered email without an email input')
+  handler = () => response('', 204)
+  await mount(<EmailVerificationPage />, '/bekraeft-email#token=verification-token')
+  check(calls.length === 0, 'Opening an email link does not consume it automatically')
+  check(!document.querySelector('[name="email"]') && !button('Send bekræftelsesmail igen'), 'Confirmation link only displays the confirmation form')
+  await click(button('Bekræft e-mailadresse'))
+  check(calls[0].path === '/api/users/auth/verify-email' && calls[0].body.token === 'verification-token', 'Confirmation submits the email token')
+  check(document.body.textContent.includes('Din e-mailadresse er bekræftet.'), 'Successful confirmation offers login')
+  handler = () => response('Linket er udløbet', 400)
+  await mount(<EmailVerificationPage />, '/bekraeft-email#token=expired-token')
+  await click(button('Bekræft e-mailadresse'))
+  check(document.querySelector('[role="alert"]').textContent.includes('udløbet'), 'Expired confirmation link shows an error')
+  check(!document.querySelector('[name="email"]') && !button('Send bekræftelsesmail igen'), 'Expired confirmation link does not expose a resend form')
+  handler = () => response('', 200)
+  await mount(<EmailVerificationPage />, '/bekraeft-email')
+  await input(document.querySelector('[name="email"]'), 'new@example.dk')
+  await click(button('Send bekræftelsesmail igen'))
+  check(calls.at(-1).path === '/api/users/auth/resend-verification', 'Standalone resend page remains available from login')
 
   let resolveConsent
   handler = () => new Promise(resolve => { resolveConsent = resolve })

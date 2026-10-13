@@ -67,6 +67,22 @@ public class User {
     @Column(name = "password_hash", nullable = false, length = 60)
     private String password;
 
+    // Existing accounts retain access; registration explicitly creates unverified accounts.
+    @JsonIgnore
+    @Builder.Default
+    @Column(name = "email_verified", nullable = false, columnDefinition = "boolean default true")
+    private boolean emailVerified = true;
+
+    @JsonIgnore
+    @Column(length = 64)
+    private String emailVerificationHash;
+
+    @JsonIgnore
+    private Instant emailVerificationExpiresAt;
+
+    @JsonIgnore
+    private Instant emailVerificationRequestedAt;
+
     @JsonIgnore
     @Column(length = 64)
     private String passwordResetHash;

@@ -70,6 +70,44 @@ public class UserDAO extends EntityManagerDAO<User> {
 
     //--------------------------------------------------------------
 
+    public boolean prepareEmailVerification(UUID id, String hash, Instant now) {
+        return executeQuery(() -> {
+            int updated = em.createQuery("""
+                    update User u set u.emailVerificationHash = :hash,
+                    u.emailVerificationExpiresAt = :expires, u.emailVerificationRequestedAt = :now
+                    where u.id = :id and u.emailVerified = false
+                    and (u.emailVerificationRequestedAt is null or u.emailVerificationRequestedAt < :cutoff)
+                    """)
+                    .setParameter("hash", hash).setParameter("expires", now.plusSeconds(86400))
+                    .setParameter("now", now).setParameter("cutoff", now.minusSeconds(60))
+                    .setParameter("id", id).executeUpdate();
+            em.clear();
+            return updated == 1;
+        });
+    }
+
+    //--------------------------------------------------------------
+
+    public User verifyEmail(String hash, Instant now) {
+        return executeQuery(() -> {
+            var ids = em.createQuery("select u.id from User u where u.emailVerificationHash = :hash", UUID.class)
+                    .setParameter("hash", hash).getResultList();
+            if (ids.isEmpty()) return null;
+            int updated = em.createQuery("""
+                    update User u set u.emailVerified = true,
+                    u.emailVerificationHash = null, u.emailVerificationExpiresAt = null
+                    where u.id = :id and u.emailVerificationHash = :hash
+                    and u.emailVerified = false and u.emailVerificationExpiresAt > :now
+                    """)
+                    .setParameter("id", ids.getFirst()).setParameter("hash", hash)
+                    .setParameter("now", now).executeUpdate();
+            em.clear();
+            return updated == 1 ? em.find(User.class, ids.getFirst()) : null;
+        });
+    }
+
+    //--------------------------------------------------------------
+
     public boolean resetPassword(String hash, String password, Instant now) {
         return executeQuery(() -> {
             int updated = em.createQuery("""
