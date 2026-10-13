@@ -34,6 +34,8 @@ jobs:
           cache-dependency-path: backend/pom.xml
       - name: Test and package backend
         working-directory: backend
+        env:
+          UPLOAD_DIR: /tmp/standflow-uploads
         run: mvn --batch-mode --no-transfer-progress verify
       - name: Configure SSH
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
