@@ -1,1 +1,0 @@
-Fix til tomme mapper, slet ved første workflow
