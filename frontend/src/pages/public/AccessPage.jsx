@@ -55,8 +55,8 @@ export default function AccessPage({ register = false }) {
     </nav>
     <form className={`${styles.panel} ${styles.form}`} onSubmit={handleSubmit}>
       {register && <div className={styles.fields}>
-        <label>Virksomhedsnavn<input name="company" autoComplete="organization" required maxLength={200} /></label>
-        <label>CVR<input name="cvr" inputMode="numeric" pattern="[0-9]{8}" title="Præcis 8 cifre" required /></label>
+        <label>Virksomhedsnavn (valgfrit)<input name="company" autoComplete="organization" maxLength={200} /></label>
+        <label>CVR (valgfrit)<input name="cvr" inputMode="numeric" pattern="[0-9]{8}" title="Præcis 8 cifre" /></label>
         <label>Fornavn<input name="firstName" autoComplete="given-name" required /></label>
         <label>Efternavn<input name="lastName" autoComplete="family-name" required /></label>
         <label>Telefon<input name="phone" type="tel" autoComplete="tel" required /></label>

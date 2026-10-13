@@ -57,10 +57,10 @@ public class UserService {
             throw new ApiException(400, "Betingelser og privatlivspolitik skal accepteres.");
         }
         User user = User.builder()
-                .company(text(body, "company", 200))
+                .company(optionalText(body, "company", 200))
                 .firstname(text(body, body.containsKey("firstName") ? "firstName" : "firstname", 75))
                 .lastname(text(body, body.containsKey("lastName") ? "lastName" : "lastname", 74))
-                .cvr(text(body, "cvr", 8))
+                .cvr(optionalText(body, "cvr", 8))
                 .email(email)
                 .phone(text(body, "phone", 30))
                 .address(text(body, "address", 255))
@@ -70,7 +70,7 @@ public class UserService {
                 .acceptMarketing(booleanField(body, "acceptMarketing"))
                 .roles(new HashSet<>(Set.of(Role.USER)))
                 .build();
-        if (!user.getCvr().matches("[0-9]{8}")) {
+        if (!user.getCvr().isEmpty() && !user.getCvr().matches("[0-9]{8}")) {
             throw new ApiException(400, "CVR skal bestå af præcis 8 cifre.");
         }
         if (userDAO.getByEmail(email) != null) {
@@ -254,6 +254,22 @@ public class UserService {
 
     private String text(Map<String, ?> body, String field, int maximumLength) {
         String value = requiredString(body, field).strip();
+        if (value.length() > maximumLength) {
+            throw new ApiException(400, field + " må højst være " + maximumLength + " tegn.");
+        }
+        return value;
+    }
+
+    //--------------------------------------------------------------
+
+    private String optionalText(Map<String, ?> body, String field, int maximumLength) {
+        if (body == null || !body.containsKey(field) || body.get(field) == null) {
+            return "";
+        }
+        if (!(body.get(field) instanceof String value)) {
+            throw new ApiException(400, field + " skal angives som tekst.");
+        }
+        value = value.strip();
         if (value.length() > maximumLength) {
             throw new ApiException(400, field + " må højst være " + maximumLength + " tegn.");
         }
