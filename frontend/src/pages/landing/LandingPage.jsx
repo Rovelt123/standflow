@@ -9,7 +9,7 @@ import manorImage from '../../assets/images/manor-by-the-lake.jpg'
 const steps = [
   { title: 'Ansøg online', icon: 'clipboard', text: 'Udfyld vores detaljerede ansøgningsformular med information om dine produkter, billeder af din stand og dine behov for strøm eller inventar.' },
   { title: 'Bliv godkendt', icon: 'medal', text: 'Vores juleudvalg vurderer alle ansøgninger løbende for at sikre et varieret kvalitetssortiment, der passer perfekt til godsets historiske rammer.' },
-  { title: 'Book din plads', icon: 'shop', text: 'Når din ansøgning er godkendt, modtager du et direkte link til endelig booking, betaling og valg af din præcise stand på plantegningen.' },
+  { title: 'Book din plads', icon: 'shop', text: 'Når din ansøgning er godkendt, modtager du et direkte link til endelig booking, betaling og valg af din præcise stand.' },
 ]
 
 const experiences = [
@@ -31,7 +31,6 @@ function LandingPage() {
             <p className={styles.description}>Træd ind i en fortryllende verden af ægte herregårdsjul. Over to dage, fredag–lørdag kl. 10:00–16:00, fyldes godsets historiske lader og gårdsplads med duften af brændte mandler, gran og lune æbleskiver. Oplev over 80 unikke boder med dansk kunsthåndværk, lokale råvarer og smuk julepynt ved bredden af Maribo Søndersø.</p>
             <div className={styles.buttons}>
               <Button to="/ansoegning" variant="primary">ANSØG OM EN STAND</Button>
-              <Button>SE PLANTEGNING</Button>
             </div>
           </div>
         </section>
