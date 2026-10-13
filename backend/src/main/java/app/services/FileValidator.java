@@ -266,16 +266,16 @@ public class FileValidator {
             if (!header && (!type.equals("IHDR") || length != 13)) throw new IOException("Invalid PNG header.");
             if (type.equals("IHDR")) {
                 if (header || offset != 8) throw new IOException("Duplicate or misplaced PNG header.");
-                int bitDepth = bytes[offset + 8] & 0xff;
-                int colorType = bytes[offset + 9] & 0xff;
+                int bitDepth = bytes[offset + 16] & 0xff;
+                int colorType = bytes[offset + 17] & 0xff;
                 boolean validDepth = switch (colorType) {
                     case 0 -> Set.of(1, 2, 4, 8, 16).contains(bitDepth);
                     case 2, 4, 6 -> bitDepth == 8 || bitDepth == 16;
                     case 3 -> Set.of(1, 2, 4, 8).contains(bitDepth);
                     default -> false;
                 };
-                if (!validDepth || bytes[offset + 10] != 0 || bytes[offset + 11] != 0
-                        || (bytes[offset + 12] != 0 && bytes[offset + 12] != 1)) {
+                if (!validDepth || bytes[offset + 18] != 0 || bytes[offset + 19] != 0
+                        || (bytes[offset + 20] != 0 && bytes[offset + 20] != 1)) {
                     throw new IOException("Invalid PNG image parameters.");
                 }
                 header = true;
