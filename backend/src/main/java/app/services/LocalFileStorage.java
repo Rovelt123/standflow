@@ -1,7 +1,5 @@
 package app.services;
 
-import app.utils.Utils;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.channels.Channels;
@@ -26,7 +24,7 @@ public class LocalFileStorage {
     //--------------------------------------------------------------
 
     public static LocalFileStorage fromEnvironment() {
-        String configured = Utils.getPropertyValue("UPLOAD_DIR", "config.properties"); //System.getenv("UPLOAD_DIR");
+        String configured = System.getenv("UPLOAD_DIR");
         if (configured == null || configured.isBlank()) {
             throw new IllegalStateException("UPLOAD_DIR must specify an absolute, writable storage directory.");
         }
