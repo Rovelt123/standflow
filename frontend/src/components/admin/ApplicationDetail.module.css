@@ -99,6 +99,36 @@
   overflow-wrap: anywhere;
 }
 
+.administration {
+  margin-top: 24px;
+}
+
+.administration fieldset {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+}
+
+.administration input,
+.administration select,
+.administration button {
+  font: inherit;
+  padding: 8px 12px;
+  max-width: 100%;
+}
+
+.administration button {
+  cursor: pointer;
+}
+
+.administration p {
+  margin: 4px 0;
+}
+
 @media (max-width: 520px) {
   .row {
     grid-template-columns: 1fr;

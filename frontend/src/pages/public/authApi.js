@@ -1,6 +1,73 @@
 const apiBaseUrl = (import.meta.env?.VITE_API_BASE_URL
-  || (import.meta.env?.DEV ? 'http://standflow.api.roneu.dk:9595' : '/api')).replace(/\/+$/, '')
+  || (import.meta.env?.DEV ? 'https://standflow.api.roneu.dk/api' : '/api')).replace(/\/+$/, '')
 const tokenKey = 'standflow.auth.token'
+
+//--------------------------------------------------------------
+
+async function verificationRequest(action, fields, fetchRequest) {
+  let response
+  try {
+    response = await fetchRequest(`${apiBaseUrl}/users/auth/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fields),
+    })
+  } catch {
+    throw new Error('Kunne ikke kontakte serveren. Prøv igen.')
+  }
+  if (response.status === 400) {
+    throw new Error(await response.text().catch(() => '') || 'Linket er ugyldigt eller udløbet. Bed om et nyt link.')
+  }
+  if (response.status !== (action === 'verify-email' ? 204 : 200)) {
+    throw new Error('Kunne ikke behandle bekræftelsen. Prøv igen senere.')
+  }
+}
+
+//--------------------------------------------------------------
+
+export function verifyEmail(token, fetchRequest = fetch) {
+  return verificationRequest('verify-email', { token }, fetchRequest)
+}
+
+//--------------------------------------------------------------
+
+export function resendVerification(email, fetchRequest = fetch) {
+  return verificationRequest('resend-verification', { email }, fetchRequest)
+}
+
+//--------------------------------------------------------------
+
+async function passwordRequest(action, fields, fetchRequest) {
+  let response
+  try {
+    response = await fetchRequest(`${apiBaseUrl}/users/auth/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fields),
+    })
+  } catch {
+    throw new Error('Kunne ikke kontakte serveren. Prøv igen.')
+  }
+  if (response.status === 400) {
+    throw new Error(await response.text().catch(() => '') || 'Kontrollér oplysningerne, eller bed om et nyt link.')
+  }
+  if (response.status !== (action === 'forgot-password' ? 200 : 204)) {
+    throw new Error('Kunne ikke nulstille adgangskoden. Prøv igen senere.')
+  }
+}
+
+//--------------------------------------------------------------
+
+export function requestPasswordReset(email, fetchRequest = fetch) {
+  return passwordRequest('forgot-password', { email }, fetchRequest)
+}
+
+//--------------------------------------------------------------
+
+export async function resetPassword(fields, fetchRequest = fetch) {
+  await passwordRequest('reset-password', fields, fetchRequest)
+  clearAuth()
+}
 
 //--------------------------------------------------------------
 
@@ -59,7 +126,7 @@ export async function authenticate(fields, register = false, fetchRequest = fetc
     throw new Error('Kunne ikke kontakte serveren. Prøv igen.')
   }
   if (response.status !== (register ? 201 : 200)) {
-    if ([400, 401, 409].includes(response.status)) {
+    if ([400, 401, 403, 409].includes(response.status)) {
       const message = await response.text().catch(() => '')
       throw new Error(message || 'Kontrollér dine oplysninger, og prøv igen.')
     }
@@ -68,6 +135,11 @@ export async function authenticate(fields, register = false, fetchRequest = fetc
   let token
   try {
     const result = await response.json()
+    if (register) {
+      if (result?.data?.verificationRequired !== true) throw new Error('Missing verification status')
+      clearAuth()
+      return result.data
+    }
     token = result?.data?.token
     if (typeof token !== 'string' || !token) throw new Error('Missing token')
   } catch {

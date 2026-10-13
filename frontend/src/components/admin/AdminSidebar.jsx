@@ -13,7 +13,6 @@ const navItems = [
   { label: 'Oversigt', icon: 'overview', to: '/kontrolpanel' },
   { label: 'Ansøgninger', icon: 'applications', to: '/kontrolpanel' },
   { label: 'Stadeholdere', icon: 'standholders', to: '/kontrolpanel/stadeholdere' },
-  { label: 'Økonomi', icon: 'economy' },
   { label: 'Indstillinger', icon: 'settings', to: '/brugerportal?tab=settings' },
   { label: 'Beskeder', icon: 'economy', to: '/kontrolpanel/beskeder' },
   { label: 'Nyhedsbrev', icon: 'economy', to: '/kontrolpanel/nyhedsbrev' },

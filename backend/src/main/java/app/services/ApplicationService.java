@@ -4,6 +4,7 @@ import app.daos.ApplicationDAO;
 import app.dtos.ApplicationDTO;
 import app.entities.Application;
 import app.enums.ApplicationStatus;
+import app.enums.ApplicationStandType;
 import app.exceptions.ApiException;
 import app.mappers.ApplicationMapper;
 import app.server.Setup;
@@ -81,6 +82,7 @@ public class ApplicationService {
         normalized.setCreatedAt(LocalDate.now(clock).toString());
         Application application = mapper.toEntity(normalized);
         application.setUserId(userId);
+        application.setMarketYear(currentMarketYear());
         Application saved;
         try {
             saved = applicationDAO.createApplication(application);
@@ -155,6 +157,9 @@ public class ApplicationService {
             updated.setUserId(userId);
             updated.setInternalComment(current.getInternalComment());
             updated.setCustomerNote(current.getCustomerNote());
+            updated.setMarketYear(current.getMarketYear());
+            updated.setAttended(current.getAttended());
+            updated.setStandLocation(current.getStandLocation());
             return applicationDAO.update(updated);
         }
     }
@@ -226,6 +231,104 @@ public class ApplicationService {
             throw new ApiException(400, "Request skal indeholde præcis feltet " + field + " som tekst.");
         }
         return value;
+    }
+
+    //--------------------------------------------------------------
+
+    public int currentMarketYear() {
+        return LocalDate.now(clock.withZone(java.time.ZoneId.of("Europe/Copenhagen"))).getYear();
+    }
+
+    //--------------------------------------------------------------
+
+    public List<Application> getForYear(String year) {
+        if ("unknown".equals(year)) return applicationDAO.getByMarketYear(null);
+        if (year == null) return applicationDAO.getByMarketYear(currentMarketYear());
+        try {
+            int parsed = Integer.parseInt(year);
+            validateYear(parsed);
+            return applicationDAO.getByMarketYear(parsed);
+        } catch (NumberFormatException exception) {
+            throw new ApiException(400, "Markedsår skal være et årstal eller unknown.");
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    public List<Application> getReusable(UUID userId) {
+        return applicationDAO.getReusableApplications(userId, currentMarketYear());
+    }
+
+    //--------------------------------------------------------------
+
+    public List<Application> getHistory(Application application) {
+        return applicationDAO.getParticipationHistory(application.getUserId(),
+                application.getMarketYear() == null ? currentMarketYear() : application.getMarketYear());
+    }
+
+    //--------------------------------------------------------------
+
+    public Application updateHistory(UUID id, Map<String, ?> body) {
+        if (body == null || !body.keySet().equals(Set.of("marketYear", "attended", "standLocation"))
+                || (body.get("marketYear") != null && !(body.get("marketYear") instanceof Integer))
+                || (body.get("attended") != null && !(body.get("attended") instanceof Boolean))
+                || (body.get("standLocation") != null && !(body.get("standLocation") instanceof String))) {
+            throw new ApiException(400, "Angiv marketYear, attended og standLocation med gyldige typer.");
+        }
+        Integer year = (Integer) body.get("marketYear");
+        Boolean attended = (Boolean) body.get("attended");
+        String location = (String) body.get("standLocation");
+        location = location == null || location.isBlank() ? null : location.strip();
+        if (year != null) validateYear(year);
+        if (location != null && location.length() > 200) {
+            throw new ApiException(400, "Standplads må højst være 200 tegn.");
+        }
+        if ((attended != null || location != null) && (year == null || year >= currentMarketYear())) {
+            throw new ApiException(400, "Deltagelse og historisk plads kræver et tidligere markedsår.");
+        }
+        if (location != null && !Boolean.TRUE.equals(attended)) {
+            throw new ApiException(400, "En historisk standplads kræver bekræftet deltagelse.");
+        }
+        synchronized (applicationDAO) {
+            Application application = getById(id);
+            application.setMarketYear(year);
+            application.setAttended(attended);
+            application.setStandLocation(location);
+            return applicationDAO.update(application);
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    public record StandTypeChange(Application application, String notificationStatus) { }
+
+    //--------------------------------------------------------------
+
+    public StandTypeChange updateStandType(UUID id, Map<String, ?> body) {
+        String value = adminField(body, "standType");
+        ApplicationStandType standType;
+        try {
+            standType = ApplicationStandType.valueOf(value);
+        } catch (IllegalArgumentException exception) {
+            throw new ApiException(400, "Standtype skal være A–H.");
+        }
+        synchronized (applicationDAO) {
+            var update = ErrorHandler.tryEntity(applicationDAO.updateStandType(id, standType), "Ansøgningen findes ikke.");
+            Application saved = update.application();
+            if (update.previousType() == standType) return new StandTypeChange(saved, "UNCHANGED");
+            try {
+                emailService.sendStandTypeChange(saved, update.previousType().name());
+                return new StandTypeChange(saved, "SENT");
+            } catch (RuntimeException exception) {
+                return new StandTypeChange(saved, "FAILED");
+            }
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    private void validateYear(int year) {
+        if (year < 1900 || year > 9999) throw new ApiException(400, "Markedsår skal være mellem 1900 og 9999.");
     }
 
     //--------------------------------------------------------------

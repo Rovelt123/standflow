@@ -9,7 +9,14 @@ import app.utils.ErrorHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.time.Clock;
+import java.util.Base64;
+import java.util.HexFormat;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -21,7 +28,11 @@ public class UserService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(UserService.class);
     private final UserDAO userDAO;
+    private final PasswordResetEmailService passwordResetEmailService;
+    private final Clock clock;
+    private final EmailVerificationService emailVerificationService;
     private final RegistrationEmailService registrationEmailService;
+    private final LocalFileStorage fileStorage;
 
     //--------------------------------------------------------------
 
@@ -38,8 +49,42 @@ public class UserService {
     //--------------------------------------------------------------
 
     public UserService(UserDAO userDAO, RegistrationEmailService registrationEmailService) {
+        this(userDAO, registrationEmailService, new GmailSmtpPasswordResetEmailService(), Clock.systemUTC());
+    }
+
+    //--------------------------------------------------------------
+
+    public UserService(UserDAO userDAO, RegistrationEmailService registrationEmailService, LocalFileStorage fileStorage) {
+        this(userDAO, registrationEmailService, new GmailSmtpPasswordResetEmailService(), Clock.systemUTC(),
+                new GmailSmtpEmailVerificationService(), fileStorage);
+    }
+
+    //--------------------------------------------------------------
+
+    public UserService(UserDAO userDAO, RegistrationEmailService registrationEmailService,
+                       PasswordResetEmailService passwordResetEmailService, Clock clock) {
+        this(userDAO, registrationEmailService, passwordResetEmailService, clock, new GmailSmtpEmailVerificationService());
+    }
+
+    //--------------------------------------------------------------
+
+    public UserService(UserDAO userDAO, RegistrationEmailService registrationEmailService,
+                       PasswordResetEmailService passwordResetEmailService, Clock clock,
+                       EmailVerificationService emailVerificationService) {
+        this(userDAO, registrationEmailService, passwordResetEmailService, clock, emailVerificationService, null);
+    }
+
+    //--------------------------------------------------------------
+
+    public UserService(UserDAO userDAO, RegistrationEmailService registrationEmailService,
+                       PasswordResetEmailService passwordResetEmailService, Clock clock,
+                       EmailVerificationService emailVerificationService, LocalFileStorage fileStorage) {
+        this.emailVerificationService = emailVerificationService;
+        this.passwordResetEmailService = passwordResetEmailService;
+        this.clock = clock;
         this.userDAO = userDAO;
         this.registrationEmailService = registrationEmailService;
+        this.fileStorage = fileStorage;
     }
 
     //--------------------------------------------------------------
@@ -57,6 +102,7 @@ public class UserService {
             throw new ApiException(400, "Betingelser og privatlivspolitik skal accepteres.");
         }
         User user = User.builder()
+                .emailVerified(false)
                 .company(optionalText(body, "company", 200))
                 .firstname(text(body, body.containsKey("firstName") ? "firstName" : "firstname", 75))
                 .lastname(text(body, body.containsKey("lastName") ? "lastName" : "lastname", 74))
@@ -78,11 +124,7 @@ public class UserService {
         }
         user.setPassword(PasswordService.hashHelper(password));
         User saved = userDAO.create(user);
-        try {
-            registrationEmailService.sendWelcome(saved);
-        } catch (RuntimeException exception) {
-            LOGGER.warn("Welcome email failed; registered account retained. Check SMTP configuration or delivery.");
-        }
+        sendVerification(saved);
         return saved;
     }
 
@@ -95,7 +137,97 @@ public class UserService {
         if (user == null || !PasswordService.passwordEquals(password, user.getPassword())) {
             throw new ApiException(401, "Forkert e-mailadresse eller adgangskode.");
         }
+        if (!user.isEmailVerified()) {
+            throw new ApiException(403, "Bekræft din e-mailadresse, før du logger ind. Du kan bede om en ny bekræftelsesmail.");
+        }
         return user;
+    }
+
+    //--------------------------------------------------------------
+
+    public void resendVerification(Map<String, ?> body) {
+        User user = userDAO.getByEmail(email(body));
+        if (user != null && !user.isEmailVerified()) sendVerification(user);
+    }
+
+    //--------------------------------------------------------------
+
+    private void sendVerification(User user) {
+        byte[] bytes = new byte[32];
+        new SecureRandom().nextBytes(bytes);
+        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        if (!userDAO.prepareEmailVerification(user.getId(), resetTokenHash(token), clock.instant())) return;
+        try {
+            emailVerificationService.sendVerification(user, token);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Verification email failed; pending account retained. Check SMTP configuration or delivery.");
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    public User verifyEmail(Map<String, ?> body) {
+        String token = requiredString(body, "token");
+        if (!token.matches("[A-Za-z0-9_-]{43}")) {
+            throw new ApiException(400, "Bekræftelseslinket er ugyldigt eller udløbet. Bed om et nyt link.");
+        }
+        User user = userDAO.verifyEmail(resetTokenHash(token), clock.instant());
+        if (user == null) {
+            throw new ApiException(400, "Bekræftelseslinket er ugyldigt eller udløbet. Bed om et nyt link.");
+        }
+        try {
+            registrationEmailService.sendWelcome(user);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Welcome email failed; verified account retained. Check SMTP configuration or delivery.");
+        }
+        return user;
+    }
+
+    //--------------------------------------------------------------
+
+    public void forgotPassword(Map<String, ?> body) {
+        User user = userDAO.getByEmail(email(body));
+        if (user == null) return;
+        byte[] bytes = new byte[32];
+        new SecureRandom().nextBytes(bytes);
+        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        if (!userDAO.preparePasswordReset(user.getId(), resetTokenHash(token), clock.instant())) return;
+        try {
+            passwordResetEmailService.sendReset(user, token);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Password reset email failed. Check SMTP configuration or delivery.");
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    public void resetPassword(Map<String, ?> body) {
+        String token = requiredString(body, "token");
+        if (!token.matches("[A-Za-z0-9_-]{43}")) {
+            throw new ApiException(400, "Nulstillingslinket er ugyldigt eller udløbet.");
+        }
+        String password = requiredString(body, "newPassword");
+        PasswordService.passwordValidation(password);
+        if (password.getBytes(StandardCharsets.UTF_8).length > 72) {
+            throw new ApiException(400, "Adgangskoden må højst fylde 72 UTF-8 bytes.");
+        }
+        if (!password.equals(requiredString(body, "confirmPassword"))) {
+            throw new ApiException(400, "Adgangskoderne skal være ens.");
+        }
+        if (!userDAO.resetPassword(resetTokenHash(token), PasswordService.hashHelper(password), clock.instant())) {
+            throw new ApiException(400, "Nulstillingslinket er ugyldigt eller udløbet.");
+        }
+    }
+
+    //--------------------------------------------------------------
+
+    private String resetTokenHash(String token) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(token.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException(exception);
+        }
     }
 
     //--------------------------------------------------------------
@@ -176,7 +308,11 @@ public class UserService {
         if (duplicate != null && !duplicate.getId().equals(id)) {
             throw new ApiException(409, "E-mailadressen er allerede registreret.");
         }
-        if (!user.getEmail().equals(email)) user.setTokenVersion(user.getTokenVersion() + 1);
+        if (!user.getEmail().equals(email)) {
+            user.setTokenVersion(user.getTokenVersion() + 1);
+            user.setPasswordResetHash(null);
+            user.setPasswordResetExpiresAt(null);
+        }
         user.setEmail(email);
         user.setCompany(company);
         user.setFirstname(firstname);
@@ -201,6 +337,8 @@ public class UserService {
         if (!password.equals(requiredString(body, "confirmPassword"))) {
             throw new ApiException(400, "De nye adgangskoder skal være ens.");
         }
+        user.setPasswordResetHash(null);
+        user.setPasswordResetExpiresAt(null);
         user.setPassword(PasswordService.hashHelper(password));
         user.setTokenVersion(user.getTokenVersion() + 1);
         return userDAO.update(user);
@@ -213,7 +351,16 @@ public class UserService {
         if (!booleanField(body, "confirmDelete")) {
             throw new ApiException(400, "Du skal bekræfte, at din bruger og dine data slettes.");
         }
-        userDAO.deleteAccount(user);
+        LocalFileStorage storage = fileStorage == null ? LocalFileStorage.fromEnvironment() : fileStorage;
+        List<String> storageKeys = userDAO.deleteAccount(user);
+        // Delete stored content only after the database transaction has committed.
+        for (String storageKey : storageKeys) {
+            try {
+                storage.delete(storageKey);
+            } catch (IOException | RuntimeException exception) {
+                LOGGER.error("Could not remove stored file {} after account deletion.", storageKey, exception);
+            }
+        }
     }
 
     //--------------------------------------------------------------

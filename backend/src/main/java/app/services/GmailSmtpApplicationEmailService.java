@@ -72,4 +72,26 @@ public class GmailSmtpApplicationEmailService implements ApplicationEmailService
         return multipart;
     }
 
+    //--------------------------------------------------------------
+
+    @Override
+    public void sendStandTypeChange(Application application, String previousStandType) {
+        try {
+            SmtpConfig config = configuration.get();
+            MimeMessage message = new MimeMessage(config.session());
+            message.setFrom(SmtpConfig.address(config.required("GMAIL_USERNAME")));
+            message.setRecipients(Message.RecipientType.TO,
+                    new jakarta.mail.Address[]{SmtpConfig.address(application.getEmail())});
+            message.setSubject("Standtypen i din ansøgning er ændret", StandardCharsets.UTF_8.name());
+            message.setText("Hej " + application.getContact() + "\n\nStandtypen for " + application.getCompany()
+                    + " (ansøgning " + application.getId() + ", markedsår "
+                    + (application.getMarketYear() == null ? "ukendt" : application.getMarketYear())
+                    + ") er ændret fra " + previousStandType + " til " + application.getStandType().name() + ".",
+                    StandardCharsets.UTF_8.name());
+            delivery.send(message);
+        } catch (MessagingException exception) {
+            throw new ApiException(500, "Ændringen er gemt, men mailen kunne ikke sendes.");
+        }
+    }
+
 }

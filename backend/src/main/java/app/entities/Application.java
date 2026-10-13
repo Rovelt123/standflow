@@ -86,4 +86,13 @@ public class Application {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDate createdAt;
+
+    @Column(name = "market_year")
+    private Integer marketYear;
+
+    @Column(name = "attended")
+    private Boolean attended;
+
+    @Column(name = "stand_location", length = 200)
+    private String standLocation;
 }
