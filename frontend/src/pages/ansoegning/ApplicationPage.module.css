@@ -26,6 +26,45 @@
   font-size: 13px;
 }
 
+.previousApplication {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+  padding: 18px 22px;
+  border: 1px solid var(--color-paper-border);
+  border-radius: var(--radius-small);
+  background: var(--color-application-panel);
+}
+
+.previousApplication label {
+  color: var(--color-burgundy);
+  font-size: 13px;
+}
+
+.previousApplication select {
+  width: 100%;
+  max-width: 480px;
+  min-width: 0;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-paper-border);
+  border-radius: var(--radius-small);
+  background: var(--color-white);
+  color: var(--color-ink);
+  font: 14px/1.4 var(--font-body);
+  cursor: pointer;
+}
+
+.previousApplication select:focus-visible {
+  outline: 2px solid var(--color-burgundy);
+  outline-offset: 3px;
+}
+
+.previousApplication select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .columns {
   min-width: 0;
   padding: 0;
