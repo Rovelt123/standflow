@@ -44,6 +44,23 @@ class GmailSmtpEmailServiceTest {
     //--------------------------------------------------------------
 
     @Test
+    void standTypeMailGoesToContactWithYearAndBothTypes() throws Exception {
+        Application application = Application.builder().id(UUID.randomUUID()).company("Vinboden")
+                .contact("Anna").email("contact@example.dk").marketYear(2026)
+                .standType(app.enums.ApplicationStandType.C).build();
+        new GmailSmtpApplicationEmailService(this::config, this::capture).sendStandTypeChange(application, "B");
+        assertEquals(1, sent.size());
+        assertEnvelope(sent.getFirst(), "contact@example.dk");
+        String content = sent.getFirst().getContent().toString();
+        assertTrue(content.contains("2026"));
+        assertTrue(content.contains("Vinboden"));
+        assertTrue(content.contains(application.getId().toString()));
+        assertTrue(content.contains("fra B til C"));
+    }
+
+    //--------------------------------------------------------------
+
+    @Test
     void verificationEmailContainsSeparateLinkAndExpiry() throws Exception {
         new GmailSmtpEmailVerificationService(this::config, this::capture)
                 .sendVerification(User.builder().email("verify@example.com").build(), "verification-token");

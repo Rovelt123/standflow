@@ -36,6 +36,17 @@
   width: 38%;
 }
 
+.participationHeader {
+  white-space: nowrap;
+}
+
+.companyCell {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .table .dateHeader {
   width: 150px;
   text-align: right;

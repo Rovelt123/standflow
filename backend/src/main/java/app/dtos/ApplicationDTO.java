@@ -30,5 +30,8 @@ public class ApplicationDTO {
     private String createdAt;
 
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Integer marketYear;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String customerNote;
 }

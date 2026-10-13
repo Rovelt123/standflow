@@ -11,7 +11,7 @@
 }
 
 .introduction {
-  margin-bottom: 24px;
+  grid-column: 1 / -1;
 }
 
 .introduction h1 {
@@ -35,6 +35,60 @@
   grid-template-columns: minmax(0, 1.235fr) minmax(0, 1fr);
   align-items: start;
   gap: calc(var(--space-large) + 6px);
+  row-gap: 24px;
+}
+
+.productLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.fields .productLabel label {
+  margin-bottom: 0;
+  line-height: 20px;
+}
+
+.help {
+  position: relative;
+  display: inline-flex;
+}
+
+.helpButton {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--color-burgundy);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-burgundy);
+  font: bold 12px/1 var(--font-body);
+  cursor: help;
+}
+
+.tooltip {
+  visibility: hidden;
+  position: absolute;
+  z-index: 2;
+  bottom: 100%;
+  right: -24px;
+  width: min(270px, 75vw);
+  padding: 12px;
+  border: 1px solid var(--color-paper-border);
+  border-radius: var(--radius-small);
+  background: var(--color-white);
+  color: var(--color-ink);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 12%);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.help:hover .tooltip,
+.help:focus-within .tooltip {
+  visibility: visible;
 }
 
 .company, .stands {
@@ -85,25 +139,6 @@
 .fields input:focus-visible, .fields textarea:focus-visible {
   outline: 2px solid var(--color-burgundy);
   outline-offset: 3px;
-}
-
-.previousExhibitor {
-  display: flex;
-  align-items: start;
-  gap: 10px;
-  margin-top: 14px;
-  font-size: 12px;
-}
-
-.previousExhibitor input {
-  accent-color: var(--color-burgundy);
-  flex: 0 0 16px;
-  width: 16px;
-  height: 16px;
-  margin: 3px 0 0;
-  border: 1px solid var(--color-gold);
-  border-radius: 2px;
-  opacity: 1;
 }
 
 .companyColumn, .standColumn {
@@ -313,7 +348,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .fields input, .fields textarea, .previousExhibitor, .standTitle, .dimensions {
+  .fields input, .fields textarea, .standTitle, .dimensions {
     font-size: 14px;
   }
 

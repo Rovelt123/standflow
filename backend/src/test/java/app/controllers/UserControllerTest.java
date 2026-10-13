@@ -718,6 +718,50 @@ class UserControllerTest {
 
     //--------------------------------------------------------------
 
+    @Test
+    void historyAndStandTypeEndpointsEnforceRolesOwnershipAndYearFilter() throws Exception {
+        String admin = tokenFor(Role.ADMIN);
+        String customer = tokenFor(Role.USER);
+        String other = tokenFor(Role.USER);
+        UUID id = createAdminTestApplication(customer);
+        String path = "/test/applications/" + id;
+        int currentYear = java.time.LocalDate.now(java.time.ZoneId.of("Europe/Copenhagen")).getYear();
+        Map<String, Object> history = Map.of("marketYear", currentYear - 2, "attended", true, "standLocation", "A12");
+        for (String token : new String[]{null, customer, other}) {
+            assertEquals(401, request("PUT", path + "/history", history, token).statusCode());
+            assertEquals(401, request("PATCH", path + "/stand-type", Map.of("standType", "B"), token).statusCode());
+        }
+        assertEquals(401, request("GET", "/test/applications/reusable", null, null).statusCode());
+        assertTrue(JSON.readTree(request("GET", "/test/applications/reusable", null, customer).body()).isEmpty());
+        var changed = request("PUT", path + "/history", history, admin);
+        assertEquals(200, changed.statusCode(), changed.body());
+        assertTrue(JSON.readTree(request("GET", "/test/applications/reusable", null, customer).body()).isEmpty());
+        assertEquals(200, request("PATCH", path + "/status", Map.of("status", "ACCEPTED"), admin).statusCode());
+        JsonNode reusable = JSON.readTree(request("GET", "/test/applications/reusable", null, customer).body());
+        assertEquals(1, reusable.size());
+        assertEquals(id.toString(), reusable.get(0).path("id").asText());
+        assertEquals(currentYear - 2, reusable.get(0).path("marketYear").asInt());
+        assertFalse(reusable.get(0).has("comment"));
+        assertTrue(JSON.readTree(request("GET", "/test/applications/reusable", null, other).body()).isEmpty());
+        assertEquals(404, request("GET", "/test/applications/mine/" + id, null, other).statusCode());
+        JsonNode previous = JSON.readTree(request("GET", "/test/applications?year=" + (currentYear - 2), null, admin).body());
+        assertTrue(java.util.stream.StreamSupport.stream(previous.spliterator(), false)
+                .anyMatch(row -> row.path("id").asText().equals(id.toString())));
+        JsonNode current = JSON.readTree(request("GET", "/test/applications", null, admin).body());
+        assertFalse(java.util.stream.StreamSupport.stream(current.spliterator(), false)
+                .anyMatch(row -> row.path("id").asText().equals(id.toString())));
+        assertEquals(400, request("GET", "/test/applications?year=invalid", null, admin).statusCode());
+        assertEquals(400, request("PATCH", path + "/stand-type", Map.of("standType", "Z"), admin).statusCode());
+        var result = request("PATCH", path + "/stand-type", Map.of("standType", "B"), admin);
+        assertEquals(200, result.statusCode(), result.body());
+        assertEquals("B", JSON.readTree(result.body()).path("application").path("standType").asText());
+        assertEquals("FAILED", JSON.readTree(result.body()).path("notificationStatus").asText());
+        var repeated = request("PATCH", path + "/stand-type", Map.of("standType", "B"), admin);
+        assertEquals("UNCHANGED", JSON.readTree(repeated.body()).path("notificationStatus").asText());
+    }
+
+    //--------------------------------------------------------------
+
     private static UUID createAdminTestApplication(String token) throws Exception {
         Map<String, Object> body = new HashMap<>(Map.of("company", "Test", "contact", "Test Person",
                 "cvr", "12345678", "email", "test@example.dk", "phone", "12345678", "address", "Testvej 1",
