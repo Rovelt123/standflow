@@ -7,9 +7,9 @@ import { portalRequest } from '../portal/portalApi.js'
 import styles from './ApplicationPage.module.css'
 
 const companyFields = [
-  { id: 'company', label: 'Virksomhedsnavn', maxLength: 200, fullWidth: true, autoComplete: 'organization' },
+  { id: 'company', label: 'Virksomhedsnavn', optional: true, maxLength: 200, fullWidth: true, autoComplete: 'organization' },
   { id: 'contact', label: 'Kontaktperson', maxLength: 150, autoComplete: 'name' },
-  { id: 'cvr', label: 'CVR-nummer', maxLength: 8, pattern: '[0-9]{8}', inputMode: 'numeric', title: 'Præcis 8 cifre' },
+  { id: 'cvr', label: 'CVR-nummer', optional: true, maxLength: 8, pattern: '[0-9]{8}', inputMode: 'numeric', title: 'Præcis 8 cifre' },
   { id: 'email', label: 'E-mailadresse', maxLength: 254, type: 'email', fullWidth: true, autoComplete: 'email' },
   { id: 'phone', label: 'Telefonnummer', maxLength: 30, type: 'tel', fullWidth: true, autoComplete: 'tel' },
   { id: 'address', label: 'Adresse', maxLength: 255, fullWidth: true, autoComplete: 'street-address' },
@@ -155,7 +155,7 @@ function ApplicationPage() {
                     <h1 id="application-title">{id ? 'Ret din ansøgning' : 'Stadeholder information'}</h1>
                     <p>Udfyld formularen nedenfor med dine virksomhedsoplysninger og stand-ønsker.</p>
                     {!id && previousApplications.length > 0 && (
-                      <div>
+                      <div className={styles.previousApplication}>
                         <label htmlFor="previous-application">Genbrug en tidligere ansøgning</label>
                         <p>Vælg en ansøgning for at udfylde felterne igen. Kontrollér oplysningerne, før du sender.</p>
                         <select id="previous-application" value={selectedPrevious} onChange={event => reuseApplication(event.target.value)}>
@@ -173,7 +173,7 @@ function ApplicationPage() {
                     <div className={styles.fields}>
                       {companyFields.map((field) => (
                         <div key={field.id} className={field.fullWidth ? styles.fullWidth : styles.field}>
-                          <label htmlFor={field.id}>{field.label}{!field.optional && ' *'}</label>
+                          <label htmlFor={field.id}>{field.label}{field.optional ? ' (valgfrit)' : ' *'}</label>
                           <input id={field.id} name={field.id} type={field.type || 'text'}
                             value={values[field.id]} onChange={event => changeValue(field.id, event.target.value)}
                             required={!field.optional} maxLength={field.maxLength} pattern={field.pattern}
